@@ -202,26 +202,112 @@ number:
     lambda: "return x * 0.1;"
     write_lambda: "return x * 10;"
     
+  # Minimum speed in MIN and Night mode (400)
+  - platform: modbus_controller
+    name: $devicename Min fan speed (Night)
+    mode: box
+    icon: "mdi:speedometer"
+    address: 210
+    force_new_range: true
+    value_type: U_WORD
+    min_value: 300
+    max_value: 680
+    step: 10
+    lambda: "return x;"
+    write_lambda: "return x;"
+    
+  # Maximum speed in Night Mode and Minimum in AUTO (550)
   - platform: modbus_controller
     name: $devicename Min fan speed
     mode: box
     icon: "mdi:speedometer"
     address: 211
+    force_new_range: true
+    value_type: U_WORD
+    min_value: 300
+    max_value: 1100
+    step: 10
+    lambda: "return x;"
+    write_lambda: "return x;"
+    
+  # Maximum speed in MIN and Minimum in MAX (680)
+  - platform: modbus_controller
+    name: $devicename Min fan speed (MAX)
+    mode: box
+    icon: "mdi:speedometer"
+    address: 212
+    force_new_range: true
     value_type: U_WORD
     min_value: 400
-    max_value: 1700
+    max_value: 1100
     step: 10
     lambda: "return x;"
     write_lambda: "return x;"
 
+  # Maximum speed in AUTO (1100)
   - platform: modbus_controller
     name: $devicename Max fan speed
     mode: box
     icon: "mdi:speedometer"
     address: 213
+    force_new_range: true
     value_type: U_WORD
-    min_value: 400
+    min_value: 550
+    max_value: 1500
+    step: 10
+    lambda: "return x;"
+    write_lambda: "return x;"
+    
+  # Maximum speed in MAX (1500)
+  - platform: modbus_controller
+    name: $devicename Max fan speed (MAX)
+    mode: box
+    icon: "mdi:speedometer"
+    address: 214
+    force_new_range: true
+    value_type: U_WORD
+    min_value: 550
+    max_value: 1500
+    step: 10
+    lambda: "return x;"
+    write_lambda: "return x;"
+    
+  # Maximum speed in MAX with Performance enabled (1700)
+  - platform: modbus_controller
+    name: $devicename Max fan speed (MAX Perf)
+    mode: box
+    icon: "mdi:speedometer"
+    address: 215
+    value_type: U_WORD
+    min_value: 550
     max_value: 1700
+    step: 10
+    lambda: "return x;"
+    write_lambda: "return x;"
+    
+  # Maximum speed in MIN and Minimum in MAX with Performance enabled (920)
+  - platform: modbus_controller
+    name: $devicename Max fan speed (MIN)
+    mode: box
+    icon: "mdi:speedometer"
+    address: 230
+    force_new_range: true
+    value_type: U_WORD
+    min_value: 550
+    max_value: 1500
+    step: 10
+    lambda: "return x;"
+    write_lambda: "return x;"
+    
+  # Maximum speed in AUTO with Performance enabled (1220)
+  - platform: modbus_controller
+    name: $devicename Max fan speed (AUTO Perf)
+    mode: box
+    icon: "mdi:speedometer"
+    address: 234
+    value_type: U_WORD
+    min_value: 550
+    max_value: 1500
     step: 10
     lambda: "return x;"
     write_lambda: "return x;"
@@ -261,6 +347,7 @@ select:
     id: season
     icon: "mdi:sun-snowflake"
     address: 233
+    force_new_range: true
     value_type: U_WORD
     optionsmap:
       #"Auto": 0
