@@ -48,6 +48,8 @@ climate:
     id: airleaf_climate
     sensor: air_temperature
     set_point_minimum_differential: 2
+    visual:
+      temperature_step: 0.5
 
     cool_action:
       - logger.log: "Cooling activated"
