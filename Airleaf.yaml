@@ -223,7 +223,7 @@ text_sensor:
     raw_encode: HEXBYTES
     filters:
       - lambda: |-
-      uint16_t value = modbus_controller::word_from_hex_str(x, 0);
+          uint16_t value = modbus_controller::word_from_hex_str(x, 0);
           return to_string(value);
       - map:
           - 0 -> No flags
@@ -246,7 +246,7 @@ text_sensor:
     raw_encode: HEXBYTES
     filters:
       - lambda: |-
-      uint16_t value = modbus_controller::word_from_hex_str(x, 0);
+          uint16_t value = modbus_controller::word_from_hex_str(x, 0);
           return to_string(value);
       - map:
           - 0 -> OK
@@ -269,7 +269,7 @@ text_sensor:
     raw_encode: HEXBYTES
     filters:
       - lambda: |-
-      uint16_t value = modbus_controller::word_from_hex_str(x, 0);
+          uint16_t value = modbus_controller::word_from_hex_str(x, 0);
           return to_string(value);
       - map:
           - 0 -> All off
