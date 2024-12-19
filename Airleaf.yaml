@@ -221,22 +221,21 @@ text_sensor:
     address: 104
     force_new_range: true
     raw_encode: HEXBYTES
-    lambda: |-
+    filters:
+      - lambda: |-
       uint16_t value = modbus_controller::word_from_hex_str(x, 0);
-      switch (value) {
-        case 0: return std::string("No flags");
-        case 1: return std::string("Cooling");
-        case 2: return std::string("Heating");
-        case 16: return std::string("Water T");
-        case 64: return std::string("Bad water");
-        case 256: return std::string("Away mode");
-        case 512: return std::string("Alarm");
-        case 1024: return std::string("Testing");
-        case 2048: return std::string("Standby");
-        case 8192: return std::string("H2 absent");
-        default: return x;
-      }
-      return x;
+          return to_string(value);
+      - map:
+          - 0 -> No flags
+          - 1 -> Cooling
+          - 2 -> Heating
+          - 16 -> Water T
+          - 64 -> Bad water
+          - 256 -> Away mode
+          - 512 -> Alarm
+          - 1024 -> Testing
+          - 2048 -> Standby
+          - 8192 -> H2 absent
 
   - platform: modbus_controller
     name: Alarm flags
@@ -245,22 +244,21 @@ text_sensor:
     register_type: read
     address: 105
     raw_encode: HEXBYTES
-    lambda: |-
+    filters:
+      - lambda: |-
       uint16_t value = modbus_controller::word_from_hex_str(x, 0);
-      switch (value) {
-        case 0: return std::string("OK");
-        case 1: return std::string("Comm");
-        case 2: return std::string("Air probe");
-        case 8: return std::string("Bad water");
-        case 16: return std::string("Water probe");
-        case 64: return std::string("HiZ");
-        case 128: return std::string("Motor");
-        case 256: return std::string("Grid");
-        case 512: return std::string("Water T");
-        case 1024: return std::string("Filter");
-        default: return x;
-      }
-      return x;
+          return to_string(value);
+      - map:
+          - 0 -> OK
+          - 1 -> Comm
+          - 2 -> Air probe
+          - 8 -> Bad water
+          - 16 -> Water probe
+          - 64 -> HiZ
+          - 128 -> Motor
+          - 256 -> Grid
+          - 512 -> Water T
+          - 1024 -> Filter
 
   - platform: modbus_controller
     name: Relay status
@@ -268,25 +266,22 @@ text_sensor:
     entity_category: diagnostic
     register_type: read
     address: 9
-    #response_size: 1
-    #offset: 1
     raw_encode: HEXBYTES
-    lambda: |-
+    filters:
+      - lambda: |-
       uint16_t value = modbus_controller::word_from_hex_str(x, 0);
-      switch (value) {
-        case 0: return std::string("All off");
-        case 1: return std::string("EV1");
-        case 2: return std::string("EV2");
-        case 3: return std::string("EV1|EV2");
-        case 4: return std::string("Chiller");
-        case 5: return std::string("Chiller|EV1");
-        case 7: return std::string("Chiller|EV1|EV2");
-        case 8: return std::string("Heater");
-        case 9: return std::string("Heater|EV1");
-        case 11: return std::string("Heater|EV1|EV2");
-        default: return x;
-      }
-      return x;
+          return to_string(value);
+      - map:
+          - 0 -> All off
+          - 1 -> EV1
+          - 2 -> EV2
+          - 3 -> EV1|EV2
+          - 4 -> Chiller
+          - 5 -> Chiller|EV1
+          - 7 -> Chiller|EV1|EV2
+          - 8 -> Heater
+          - 9 -> Heater|EV1
+          - 11 -> Heater|EV1|EV2
 
 number:
   - platform: modbus_controller
@@ -311,7 +306,7 @@ number:
       then:
         - if:
             condition:
-              lambda: 'return id(airleaf_climate).mode == CLIMATE_MODE_COOL;'
+              lambda: "return id(airleaf_climate).mode == CLIMATE_MODE_COOL;"
             then:
               - climate.control:
                   id: airleaf_climate
