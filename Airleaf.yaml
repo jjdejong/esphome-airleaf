@@ -73,7 +73,7 @@ climate:
     off_mode:
       - if:
           condition:
-            lambda: 'return id(fan_mode).state != "Standby";'
+            lambda: 'return id(fan_mode).current_option() != "Standby";'
           then:
             - select.set:
                 id: fan_mode
@@ -81,7 +81,7 @@ climate:
     heat_mode:
       - if:
           condition:
-            lambda: 'return id(season).state != "Winter";'
+            lambda: 'return id(season).current_option() != "Winter";'
           then:
             - select.set:
                 id: season
@@ -89,7 +89,7 @@ climate:
     cool_mode:
       - if:
           condition:
-            lambda: 'return id(season).state != "Summer";'
+            lambda: 'return id(season).current_option() != "Summer";'
           then:
             - select.set:
                 id: season
@@ -98,7 +98,7 @@ climate:
     fan_mode_auto_action:
       - if:
           condition:
-            lambda: 'return id(fan_mode).state != "Auto";'
+            lambda: 'return id(fan_mode).current_option() != "Auto";'
           then:
             - select.set:
                 id: fan_mode
@@ -106,7 +106,7 @@ climate:
     fan_mode_quiet_action:
       - if:
           condition:
-            lambda: 'return id(fan_mode).state != "Night";'
+            lambda: 'return id(fan_mode).current_option() != "Night";'
           then:
             - select.set:
                 id: fan_mode
@@ -114,7 +114,7 @@ climate:
     fan_mode_low_action:
       - if:
           condition:
-            lambda: 'return id(fan_mode).state != "Low";'
+            lambda: 'return id(fan_mode).current_option() != "Low";'
           then:
             - select.set:
                 id: fan_mode
@@ -122,7 +122,7 @@ climate:
     fan_mode_high_action:
       - if:
           condition:
-            lambda: 'return id(fan_mode).state != "High";'
+            lambda: 'return id(fan_mode).current_option() != "High";'
           then:
             - select.set:
                 id: fan_mode
@@ -567,11 +567,11 @@ switch:
     icon: "mdi:power-standby"
     entity_category: config
     lambda: |-
-      auto val = id(fan_mode).state;
+      auto val = id(fan_mode).current_option();
       return val == "Standby";
     turn_on_action:
       - lambda: |-
-          id(fan_mode_state) = id(fan_mode).state;
+          id(fan_mode_state) = id(fan_mode).current_option();
       - select.set:
           id: fan_mode
           option: "Standby"
@@ -585,7 +585,7 @@ switch:
     name: Night mode
     icon: "mdi:weather-night"
     lambda: |-
-      auto val = id(fan_mode).state;
+      auto val = id(fan_mode).current_option();
       return val == "Night";
     turn_on_action:
       - select.set:
