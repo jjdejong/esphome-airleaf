@@ -74,7 +74,7 @@ climate:
       - if:
           condition:
             lambda: |-
-              auto val = id(fan_mode).current_option();
+              std::string val = id(fan_mode).current_option().value_or("");
               return val != "Standby";
           then:
             - select.set:
@@ -84,7 +84,7 @@ climate:
       - if:
           condition:
             lambda: |-
-              auto val = id(season).current_option();
+              std::string val = id(season).current_option().value_or("");
               return val != "Winter";
           then:
             - select.set:
@@ -94,7 +94,7 @@ climate:
       - if:
           condition:
             lambda: |-
-              auto val = id(season).current_option();
+              std::string val = id(season).current_option().value_or("");
               return val != "Summer";
           then:
             - select.set:
@@ -105,7 +105,7 @@ climate:
       - if:
           condition:
             lambda: |-
-              auto val = id(fan_mode).current_option();
+              std::string val = id(fan_mode).current_option().value_or("");
               return val != "Auto";
           then:
             - select.set:
@@ -115,7 +115,7 @@ climate:
       - if:
           condition:
             lambda: |-
-              auto val = id(fan_mode).current_option();
+              std::string val = id(fan_mode).current_option().value_or("");
               return val != "Night";
           then:
             - select.set:
@@ -125,7 +125,7 @@ climate:
       - if:
           condition:
             lambda: |-
-              auto val = id(fan_mode).current_option();
+              std::string val = id(fan_mode).current_option().value_or("");
               return val != "Low";
           then:
             - select.set:
@@ -135,7 +135,7 @@ climate:
       - if:
           condition:
             lambda: |-
-              auto val = id(fan_mode).current_option();
+              std::string val = id(fan_mode).current_option().value_or("");
               return val != "High";
           then:
             - select.set:
@@ -886,11 +886,11 @@ switch:
     icon: "mdi:power-standby"
     entity_category: config
     lambda: |-
-      auto val = id(fan_mode).current_option();
+      std::string val = id(fan_mode).current_option().value_or("");
       return val == "Standby";
     turn_on_action:
       - lambda: |-
-          id(fan_mode_state) = id(fan_mode).current_option();
+          id(fan_mode_state) = id(fan_mode).current_option().value_or("");
       - select.set:
           id: fan_mode
           option: "Standby"
@@ -904,7 +904,7 @@ switch:
     name: Night mode
     icon: "mdi:weather-night"
     lambda: |-
-      auto val = id(fan_mode).current_option();
+      std::string val = id(fan_mode).current_option().value_or("");
       return val == "Night";
     turn_on_action:
       - select.set:
