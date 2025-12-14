@@ -5,6 +5,8 @@ substitutions:
 
 esphome:
   name: $devicename
+  includes:
+    - espnow_sender.h
 
 esp8266:
   board: d1_mini
@@ -186,6 +188,15 @@ sensor:
   - platform: wifi_signal
     name: rssi
     update_interval: 60s
+
+  # Motor RPM feedback from ESP-NOW
+  - platform: template
+    name: "Motor RPM Feedback"
+    id: motor_rpm_feedback
+    unit_of_measurement: 'RPM'
+    accuracy_decimals: 0
+    icon: "mdi:speedometer"
+    state_class: measurement
 
   # Register 000: T1 - Air temperature
   - platform: modbus_controller
@@ -922,3 +933,15 @@ globals:
   - id: fan_mode_state
     type: std::string
     #initial_value: "Auto"
+
+  # Motor controller MAC address - UPDATE after flashing motor controller
+  - id: motor_controller_mac
+    type: uint8_t[6]
+    restore_value: no
+    # Format: {0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF}
+
+# Custom component for ESP-NOW sender
+custom_component:
+  - lambda: |-
+      auto espnow_sender = new ESPNowSender();
+      return {espnow_sender};
