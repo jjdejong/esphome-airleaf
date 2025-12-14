@@ -399,18 +399,15 @@ switch:
 ```yaml
 text:
   - platform: template
-    name: "Motor Controller MAC Byte 0"
-    id: motor_mac_0
+    name: "Slave Motor Controller MAC Address"
+    id: motor_controller_mac
     entity_category: config
     mode: text
     optimistic: true
-    initial_value: "FF"
+    initial_value: "FF:FF:FF:FF:FF:FF"
     restore_value: true
-    min_length: 2
-    max_length: 2
-
-  # Repeat for bytes 1-5 (motor_mac_1 through motor_mac_5)
-  # See full example in Airleaf.yaml
+    min_length: 17
+    max_length: 17
 ```
 
 #### 4. Add custom component for ESP-NOW sender
@@ -456,6 +453,24 @@ uint8_t hexToByte(const std::string& hex) {
   return (uint8_t)strtol(hex.c_str(), nullptr, 16);
 }
 
+// Parse MAC address from "AA:BB:CC:DD:EE:FF" format
+bool parseMacAddress(const std::string& mac_str, uint8_t* mac_array) {
+  if (mac_str.length() != 17) {
+    return false;
+  }
+
+  for (int i = 0; i < 6; i++) {
+    int pos = i * 3;
+    if (i > 0 && mac_str[pos - 1] != ':') {
+      return false;
+    }
+    std::string byte_hex = mac_str.substr(pos, 2);
+    mac_array[i] = hexToByte(byte_hex);
+  }
+
+  return true;
+}
+
 class ESPNowSender : public Component {
  private:
   bool espnow_initialized = false;
@@ -464,19 +479,18 @@ class ESPNowSender : public Component {
 
  public:
   void setup() override {
-    // Only initialize if motor controller is enabled
+    // Only initialize if slave motor controller is enabled
     if (!id(motor_controller_enabled).state) {
-      ESP_LOGI("espnow", "Motor controller disabled - ESP-NOW not initialized");
+      ESP_LOGI("espnow", "Slave motor controller disabled - ESP-NOW not initialized");
       return;
     }
 
-    // Build MAC address from text inputs
-    motorControllerMac[0] = hexToByte(id(motor_mac_0).state);
-    motorControllerMac[1] = hexToByte(id(motor_mac_1).state);
-    motorControllerMac[2] = hexToByte(id(motor_mac_2).state);
-    motorControllerMac[3] = hexToByte(id(motor_mac_3).state);
-    motorControllerMac[4] = hexToByte(id(motor_mac_4).state);
-    motorControllerMac[5] = hexToByte(id(motor_mac_5).state);
+    // Parse MAC address from single text field
+    std::string mac_str = id(motor_controller_mac).state;
+    if (!parseMacAddress(mac_str, motorControllerMac)) {
+      ESP_LOGE("espnow", "Invalid MAC address format: %s (expected AA:BB:CC:DD:EE:FF)", mac_str.c_str());
+      return;
+    }
 
     // Check if MAC is all FF (unconfigured)
     bool mac_configured = false;
@@ -488,7 +502,7 @@ class ESPNowSender : public Component {
     }
 
     if (!mac_configured) {
-      ESP_LOGW("espnow", "Motor controller MAC not configured (all FF) - skipping");
+      ESP_LOGW("espnow", "Slave motor controller MAC not configured (all FF) - ESP-NOW not initialized");
       return;
     }
 
@@ -605,16 +619,12 @@ Connect to your 5-wire BLDC motor according to motor manufacturer's pinout:
 
 1. Flash Airleaf configuration (motor controller integration starts disabled by default)
 2. In Home Assistant, navigate to the Airleaf device
-3. Enable the motor controller:
-   - Toggle "Motor Controller Enabled" switch to **ON**
+3. Enable the slave motor controller:
+   - Toggle "Slave Motor Controller Enabled" switch to **ON**
 4. Configure the MAC address from Step 1:
-   - Enter each byte in hex format (e.g., for MAC `A1:B2:C3:D4:E5:F6`):
-     - Motor Controller MAC Byte 0: `A1`
-     - Motor Controller MAC Byte 1: `B2`
-     - Motor Controller MAC Byte 2: `C3`
-     - Motor Controller MAC Byte 3: `D4`
-     - Motor Controller MAC Byte 4: `E5`
-     - Motor Controller MAC Byte 5: `F6`
+   - Enter the complete MAC address in the format `AA:BB:CC:DD:EE:FF`
+   - Example: For MAC `A1:B2:C3:D4:E5:F6`, enter: `A1:B2:C3:D4:E5:F6`
+   - Field name: "Slave Motor Controller MAC Address"
 5. Restart the Airleaf device to apply changes
 
 **Note**: The Airleaf device functions normally even when the motor controller is disabled or not configured.

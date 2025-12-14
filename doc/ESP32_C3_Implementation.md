@@ -68,11 +68,25 @@ espnow:
 
 Uses native ESPHome `espnow.send` action with lambda data preparation.
 
+**IMPORTANT**: This file is a **COMPLETE, COMPILABLE CONFIGURATION** (1007 lines) - it includes the full Airleaf functionality converted to ESP32-C3 with native ESP-NOW integration.
+
+**What's Included**:
+- Complete climate control with thermostat and all presets
+- All Modbus RTU sensors (temperatures, fan speed, power, frequencies)
+- All binary sensors (status flags, alarms, relay outputs)
+- All configuration entities (numbers, selects, switches)
+- Native ESP-NOW send action with binary float serialization
+- `id: fan_speed` added to modbus sensor (line 249) - required for ESP32-C3
+- UART pins adjusted for ESP32-C3 (GPIO20/GPIO21)
+- Single MAC address field with inline parsing
+- Optional slave motor controller (default OFF)
+
 **Key Features**:
-- Native ESP-NOW send action
+- Native ESP-NOW send action (no custom C++ headers)
 - MAC address configurable in Home Assistant
 - Global variables for data passing
 - Compatible with ESP8266 receivers
+- Production-ready configuration
 
 **ESP-NOW Send Implementation**:
 ```yaml
@@ -92,6 +106,43 @@ script:
                     (uint8_t)((*(uint32_t*)&rpm) >> 16),
                     (uint8_t)((*(uint32_t*)&rpm) >> 24)};
 ```
+
+## Important Notes
+
+### Sensor ID Requirement
+
+The "Fan speed" sensor in the original `Airleaf.yaml` (line ~241) does not have an `id:` field. This works fine with the ESP8266 version because:
+- ESP8266 uses custom C++ headers that can reference sensors by name
+- The custom component has direct access to ESPHome internals
+
+For ESP32-C3 native ESP-NOW to work, you **must** add `id: fan_speed` to the modbus sensor:
+
+```yaml
+# Original (Airleaf.yaml)
+sensor:
+  - platform: modbus_controller
+    name: Fan speed
+    # No ID field
+    register_type: read
+    address: 15
+
+# Required for ESP32-C3
+sensor:
+  - platform: modbus_controller
+    name: Fan speed
+    id: fan_speed  # <-- Add this line
+    register_type: read
+    address: 15
+```
+
+### Complete Configuration Ready for Use
+
+The `Airleaf_esp32c3.yaml` file is a complete, production-ready configuration:
+- Full 1007 lines converted from Airleaf.yaml
+- All climate, sensors, binary_sensors, numbers, selects, switches included
+- Only platform-specific changes made (ESP32-C3 pins, native ESP-NOW, ESP-IDF framework)
+- Ready to compile and flash without modifications
+- Just update your `secrets.yaml` and deploy
 
 ## Pin Assignments for ESP32-C3 Super Mini
 
@@ -141,6 +192,49 @@ The ESP32-C3 Super Mini is a compact development board. Adjust pins as needed:
 - Cost is absolutely critical
 - Your current system works fine
 
+## Framework Choice: ESP-IDF vs Arduino
+
+For ESP32-C3, **ESP-IDF is strongly recommended** over Arduino framework:
+
+### Why ESP-IDF?
+
+According to [ESPHome's migration guide](https://esphome.io/guides/esp32_arduino_to_idf/):
+
+✅ **Performance**: Up to 40% reduction in binary size
+✅ **Efficiency**: Lower flash and RAM usage (Arduino includes ESP-IDF + compatibility layer)
+✅ **Latest Features**: New ESP32 features available in ESP-IDF first
+✅ **Active Development**: All ESPHome developers test with ESP-IDF
+✅ **Official**: ESP-IDF is Espressif's official development framework
+
+### When to Use Arduino?
+
+Only use Arduino framework if:
+- You need specific Arduino-only libraries
+- You have legacy code that requires Arduino compatibility
+- Specific ESPHome components require it (rare in 2025)
+
+### Configuration
+
+Both frameworks work with ESP32-C3, but ESP-IDF is preferred:
+
+```yaml
+# Recommended (ESP-IDF)
+esp32:
+  board: esp32-c3-devkitm-1
+  variant: ESP32C3
+  framework:
+    type: esp-idf
+
+# Alternative (Arduino - only if needed)
+esp32:
+  board: esp32-c3-devkitm-1
+  variant: ESP32C3
+  framework:
+    type: arduino
+```
+
+You can switch between frameworks at any time by changing your configuration.
+
 ## Configuration Differences
 
 ### 1. Platform Declaration
@@ -157,7 +251,7 @@ esp32:
   board: esp32-c3-devkitm-1
   variant: ESP32C3
   framework:
-    type: arduino
+    type: esp-idf  # Recommended for ESP32-C3
 ```
 
 ### 2. PWM Output
