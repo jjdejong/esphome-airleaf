@@ -49,9 +49,23 @@ class ESPNowSender : public Component {
   bool espnow_initialized = false;
   bool peer_added = false;
   uint8_t motorControllerMac[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+  sensor::Sensor *fan_speed_sensor = nullptr;
 
  public:
   void setup() override {
+    // Get the Fan speed sensor by object_id
+    for (auto *obj : App.get_sensors()) {
+      if (obj->get_object_id() == "fan_speed") {
+        fan_speed_sensor = obj;
+        break;
+      }
+    }
+
+    if (fan_speed_sensor == nullptr) {
+      ESP_LOGW("espnow", "Fan speed sensor not found - ESP-NOW not initialized");
+      return;
+    }
+
     // Only initialize if slave motor controller is enabled
     if (!id(motor_controller_enabled).state) {
       ESP_LOGI("espnow", "Slave motor controller disabled - ESP-NOW not initialized");
@@ -118,8 +132,12 @@ class ESPNowSender : public Component {
     }
 
     // Send motor speed setpoint from "Fan speed" sensor as RPM
+    if (fan_speed_sensor == nullptr || !fan_speed_sensor->has_state()) {
+      return;
+    }
+
     static float lastRPM = -1;
-    float currentRPM = id(fan_speed).state;
+    float currentRPM = fan_speed_sensor->state;
 
     // Send if RPM changed by more than 5 RPM to reduce traffic
     if (abs(currentRPM - lastRPM) > 5.0) {
