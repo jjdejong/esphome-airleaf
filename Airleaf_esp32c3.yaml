@@ -1,0 +1,150 @@
+substitutions:
+  devicename: airleaf-esp32c3-01
+
+esphome:
+  name: $devicename
+
+esp32:
+  board: esp32-c3-devkitm-1
+  variant: ESP32C3
+  framework:
+    type: arduino
+
+logger:
+  level: DEBUG
+
+# Enable Home Assistant API
+api:
+
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  fast_connect: true
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: $devicename
+    password: !secret ap_password
+
+captive_portal:
+
+# Global variables for ESP-NOW send
+globals:
+  - id: espnow_target_mac
+    type: uint8_t[6]
+    restore_value: no
+  - id: espnow_rpm_data
+    type: float
+    restore_value: no
+
+# Native ESP-NOW component (ESP32 only)
+espnow:
+
+# Note: The rest of your Airleaf configuration would go here
+# This example focuses on the ESP-NOW sender integration
+
+# Example modbus sensor (you would use your actual Airleaf modbus configuration)
+sensor:
+  # Placeholder for demonstration - replace with actual fan_speed sensor from Modbus
+  - platform: template
+    name: "Fan Speed"
+    id: fan_speed
+    unit_of_measurement: 'RPM'
+    accuracy_decimals: 0
+    # In reality, this would come from modbus_controller
+    # For now, it's a template for testing
+    lambda: "return 1000.0;"  # Placeholder value
+    update_interval: 5s
+    on_value:
+      then:
+        # Send RPM via ESP-NOW when it changes
+        - if:
+            condition:
+              switch.is_on: motor_controller_enabled
+            then:
+              - lambda: |-
+                  static float last_rpm = -1.0;
+                  float current_rpm = id(fan_speed).state;
+
+                  // Send if RPM changed by more than 5 RPM
+                  if (abs(current_rpm - last_rpm) > 5.0) {
+                    last_rpm = current_rpm;
+                    id(espnow_rpm_data) = current_rpm;
+
+                    std::string mac_str = id(motor_controller_mac).state;
+
+                    // Parse MAC address (format: AA:BB:CC:DD:EE:FF)
+                    if (mac_str.length() == 17) {
+                      for (int i = 0; i < 6; i++) {
+                        std::string byte_str = mac_str.substr(i * 3, 2);
+                        id(espnow_target_mac)[i] = (uint8_t)strtol(byte_str.c_str(), nullptr, 16);
+                      }
+
+                      // Check if MAC is configured (not all FF)
+                      bool mac_configured = false;
+                      for (int i = 0; i < 6; i++) {
+                        if (id(espnow_target_mac)[i] != 0xFF) {
+                          mac_configured = true;
+                          break;
+                        }
+                      }
+
+                      if (mac_configured) {
+                        ESP_LOGD("espnow", "Triggering send: RPM %.0f", current_rpm);
+                        id(send_rpm_script).execute();
+                      } else {
+                        ESP_LOGD("espnow", "Slave motor controller MAC not configured");
+                      }
+                    } else {
+                      ESP_LOGW("espnow", "Invalid MAC address format");
+                    }
+                  }
+
+script:
+  - id: send_rpm_script
+    then:
+      - espnow.send:
+          address: !lambda |-
+            static uint8_t mac[6];
+            memcpy(mac, id(espnow_target_mac), 6);
+            return mac;
+          data: !lambda |-
+            float rpm = id(espnow_rpm_data);
+            return {(uint8_t)(*(uint32_t*)&rpm),
+                    (uint8_t)((*(uint32_t*)&rpm) >> 8),
+                    (uint8_t)((*(uint32_t*)&rpm) >> 16),
+                    (uint8_t)((*(uint32_t*)&rpm) >> 24)};
+
+switch:
+  - platform: restart
+    name: Restart
+
+  # Enable/disable slave motor controller ESP-NOW communication
+  - platform: template
+    name: "Slave Motor Controller Enabled"
+    id: motor_controller_enabled
+    icon: "mdi:motor"
+    entity_category: config
+    restore_mode: RESTORE_DEFAULT_OFF
+    optimistic: true
+
+# Slave motor controller MAC address configuration
+text:
+  - platform: template
+    name: "Slave Motor Controller MAC Address"
+    id: motor_controller_mac
+    entity_category: config
+    mode: text
+    optimistic: true
+    initial_value: "FF:FF:FF:FF:FF:FF"
+    restore_value: true
+    min_length: 17
+    max_length: 17
+    icon: "mdi:identifier"
+
+# Note: This configuration uses the native ESPHome espnow component
+# which is only available on ESP32 devices. The ESP-NOW protocol
+# is compatible between ESP32 and ESP8266 devices.

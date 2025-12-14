@@ -1,0 +1,164 @@
+esphome:
+  name: motor-controller-esp32c3
+
+esp32:
+  board: esp32-c3-devkitm-1
+  variant: ESP32C3
+  framework:
+    type: arduino
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+api:
+
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+logger:
+  level: DEBUG
+
+# Native ESP-NOW component (ESP32 only)
+espnow:
+  on_receive:
+    then:
+      - lambda: |-
+          // Parse float from 4-byte binary data sent by ESP8266 Airleaf
+          // Data structure: struct { float speed_setpoint; }
+          if (size >= 4) {
+            float target_rpm = *((float*)(data));
+
+            ESP_LOGD("espnow", "Received from %s: %.0f RPM",
+                     format_mac_address_pretty(info.src_addr).c_str(), target_rpm);
+
+            // Update target RPM global
+            id(target_rpm_setpoint) = target_rpm;
+
+            // Adjustable RPM to PWM percentage mapping
+            float multiplier = id(speed_mapping_multiplier).state;
+            float speed_percent = target_rpm * multiplier;
+
+            // Alternative method (commented out):
+            // float max_rpm = id(max_rpm_reference).state;
+            // float speed_percent = (target_rpm / max_rpm) * 100.0;
+
+            // Clamp to 0-100%
+            if (speed_percent < 0) speed_percent = 0;
+            if (speed_percent > 100) speed_percent = 100;
+
+            // Update PWM percentage sensor for monitoring
+            id(motor_pwm_percent).publish_state(speed_percent);
+
+            // Control motor
+            auto call = id(bldc_motor).make_call();
+            if (target_rpm > 0) {
+              call.set_state(true);
+              call.set_speed((int)speed_percent);
+            } else {
+              call.set_state(false);
+            }
+            call.perform();
+
+            ESP_LOGD("espnow", "Target RPM: %.0f, PWM: %.1f%%", target_rpm, speed_percent);
+          } else {
+            ESP_LOGW("espnow", "Received packet too small: %d bytes", size);
+          }
+
+# PWM output for motor speed control
+output:
+  - platform: ledc
+    pin: GPIO4  # Adjust pin as needed for ESP32-C3
+    frequency: 1000 Hz
+    id: motor_pwm_output
+
+# Fan platform for motor control
+fan:
+  - platform: speed
+    output: motor_pwm_output
+    name: "BLDC Motor"
+    id: bldc_motor
+    restore_mode: RESTORE_DEFAULT_OFF
+
+# Tachometer pulse counter
+sensor:
+  - platform: pulse_counter
+    pin:
+      number: GPIO5  # Adjust pin as needed for ESP32-C3
+      mode:
+        input: true
+        pullup: true
+    name: "Motor RPM"
+    id: motor_rpm
+    unit_of_measurement: 'RPM'
+    accuracy_decimals: 0
+    update_interval: 2s
+    count_mode:
+      rising_edge: INCREMENT
+      falling_edge: DISABLE
+    filters:
+      # Calibration: adjust multiplier based on motor's pulses per revolution
+      # Formula: 60 / (pulses_per_revolution * update_interval_seconds)
+      # Example: For 2 pulses/rev with 2s update: 60 / (2 * 2) = 15
+      - multiply: 30.0
+      - sliding_window_moving_average:
+          window_size: 5
+          send_every: 1
+
+  # Target RPM setpoint from Airleaf controller
+  - platform: template
+    name: "Target RPM Setpoint"
+    id: target_rpm_setpoint_sensor
+    unit_of_measurement: 'RPM'
+    accuracy_decimals: 0
+    icon: "mdi:speedometer-slow"
+    lambda: "return id(target_rpm_setpoint);"
+    update_interval: 1s
+
+  # Calculated PWM percentage (for monitoring)
+  - platform: template
+    name: "Motor PWM Percentage"
+    id: motor_pwm_percent
+    unit_of_measurement: '%'
+    accuracy_decimals: 1
+    icon: "mdi:percent"
+    state_class: measurement
+
+number:
+  # RPM to PWM percentage mapping multiplier
+  - platform: template
+    name: "Speed Mapping Multiplier"
+    id: speed_mapping_multiplier
+    min_value: 0.01
+    max_value: 0.10
+    step: 0.001
+    initial_value: 0.05
+    mode: box
+    optimistic: true
+    icon: "mdi:tune"
+    unit_of_measurement: "%/RPM"
+    entity_category: config
+    restore_value: true
+
+  # Maximum RPM reference for percentage calculation
+  - platform: template
+    name: "Max RPM Reference"
+    id: max_rpm_reference
+    min_value: 500
+    max_value: 3000
+    step: 50
+    initial_value: 2000
+    mode: box
+    optimistic: true
+    icon: "mdi:speedometer"
+    unit_of_measurement: "RPM"
+    entity_category: config
+    restore_value: true
+
+# Global variables
+globals:
+  - id: target_rpm_setpoint
+    type: float
+    restore_value: no
+    initial_value: '0.0'
