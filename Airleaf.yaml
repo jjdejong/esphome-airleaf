@@ -7,6 +7,12 @@ esphome:
   name: $devicename
   includes:
     - espnow_sender.h
+  on_boot:
+    priority: -100
+    then:
+      - lambda: |-
+          static ESPNowSender* espnow_sender = new ESPNowSender();
+          App.register_component(espnow_sender);
 
 esp8266:
   board: d1_mini
@@ -947,9 +953,3 @@ globals:
   - id: fan_mode_state
     type: std::string
     #initial_value: "Auto"
-
-# Custom component for ESP-NOW sender
-custom_component:
-  - lambda: |-
-      auto espnow_sender = new ESPNowSender();
-      return {espnow_sender};

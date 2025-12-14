@@ -97,6 +97,12 @@ esphome:
   name: motor-controller
   includes:
     - espnow_receiver.h
+  on_boot:
+    priority: -100
+    then:
+      - lambda: |-
+          static ESPNowComponent* espnow_comp = new ESPNowComponent();
+          App.register_component(espnow_comp);
 
 esp8266:
   board: d1_mini
@@ -213,13 +219,9 @@ globals:
   - id: sender_mac
     type: uint8_t[6]
     restore_value: no
-
-# Custom component for ESP-NOW receiver
-custom_component:
-  - lambda: |-
-      auto espnow_comp = new ESPNowComponent();
-      return {espnow_comp};
 ```
+
+**Note**: The custom component is registered via the `on_boot` hook in the `esphome:` block above.
 
 ### Adjustable Speed Mapping
 
@@ -376,6 +378,12 @@ esphome:
   name: $devicename
   includes:
     - espnow_sender.h
+  on_boot:
+    priority: -100
+    then:
+      - lambda: |-
+          static ESPNowSender* espnow_sender = new ESPNowSender();
+          App.register_component(espnow_sender);
 ```
 
 #### 2. Add motor controller enable switch
@@ -410,15 +418,7 @@ text:
     max_length: 17
 ```
 
-#### 4. Add custom component for ESP-NOW sender
-
-```yaml
-# Custom component for ESP-NOW sender
-custom_component:
-  - lambda: |-
-      auto espnow_sender = new ESPNowSender();
-      return {espnow_sender};
-```
+**Note**: The custom component is registered via the `on_boot` hook shown in step 1 above.
 
 ### File: `espnow_sender.h`
 

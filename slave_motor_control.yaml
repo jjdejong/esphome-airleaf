@@ -2,6 +2,12 @@ esphome:
   name: motor-controller
   includes:
     - espnow_receiver.h
+  on_boot:
+    priority: -100
+    then:
+      - lambda: |-
+          static ESPNowComponent* espnow_comp = new ESPNowComponent();
+          App.register_component(espnow_comp);
 
 esp8266:
   board: d1_mini
@@ -118,9 +124,3 @@ globals:
   - id: sender_mac
     type: uint8_t[6]
     restore_value: no
-
-# Custom component for ESP-NOW receiver
-custom_component:
-  - lambda: |-
-      auto espnow_comp = new ESPNowComponent();
-      return {espnow_comp};
