@@ -920,16 +920,87 @@ switch:
   - platform: restart
     name: Restart
 
+  # Enable/disable motor controller ESP-NOW communication
+  - platform: template
+    name: "Motor Controller Enabled"
+    id: motor_controller_enabled
+    icon: "mdi:motor"
+    entity_category: config
+    restore_mode: RESTORE_DEFAULT_OFF
+    optimistic: true
+
+# Motor controller MAC address configuration
+text:
+  - platform: template
+    name: "Motor Controller MAC Byte 0"
+    id: motor_mac_0
+    entity_category: config
+    mode: text
+    optimistic: true
+    initial_value: "FF"
+    restore_value: true
+    min_length: 2
+    max_length: 2
+
+  - platform: template
+    name: "Motor Controller MAC Byte 1"
+    id: motor_mac_1
+    entity_category: config
+    mode: text
+    optimistic: true
+    initial_value: "FF"
+    restore_value: true
+    min_length: 2
+    max_length: 2
+
+  - platform: template
+    name: "Motor Controller MAC Byte 2"
+    id: motor_mac_2
+    entity_category: config
+    mode: text
+    optimistic: true
+    initial_value: "FF"
+    restore_value: true
+    min_length: 2
+    max_length: 2
+
+  - platform: template
+    name: "Motor Controller MAC Byte 3"
+    id: motor_mac_3
+    entity_category: config
+    mode: text
+    optimistic: true
+    initial_value: "FF"
+    restore_value: true
+    min_length: 2
+    max_length: 2
+
+  - platform: template
+    name: "Motor Controller MAC Byte 4"
+    id: motor_mac_4
+    entity_category: config
+    mode: text
+    optimistic: true
+    initial_value: "FF"
+    restore_value: true
+    min_length: 2
+    max_length: 2
+
+  - platform: template
+    name: "Motor Controller MAC Byte 5"
+    id: motor_mac_5
+    entity_category: config
+    mode: text
+    optimistic: true
+    initial_value: "FF"
+    restore_value: true
+    min_length: 2
+    max_length: 2
+
 globals:
   - id: fan_mode_state
     type: std::string
     #initial_value: "Auto"
-
-  # Motor controller MAC address - UPDATE after flashing motor controller
-  - id: motor_controller_mac
-    type: uint8_t[6]
-    restore_value: no
-    # Format: {0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF}
 
 # Custom component for ESP-NOW sender
 custom_component:
