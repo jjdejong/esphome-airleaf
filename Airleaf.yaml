@@ -920,82 +920,28 @@ switch:
   - platform: restart
     name: Restart
 
-  # Enable/disable motor controller ESP-NOW communication
+  # Enable/disable slave motor controller ESP-NOW communication
   - platform: template
-    name: "Motor Controller Enabled"
+    name: "Slave Motor Controller Enabled"
     id: motor_controller_enabled
     icon: "mdi:motor"
     entity_category: config
     restore_mode: RESTORE_DEFAULT_OFF
     optimistic: true
 
-# Motor controller MAC address configuration
+# Slave motor controller MAC address configuration
 text:
   - platform: template
-    name: "Motor Controller MAC Byte 0"
-    id: motor_mac_0
+    name: "Slave Motor Controller MAC Address"
+    id: motor_controller_mac
     entity_category: config
     mode: text
     optimistic: true
-    initial_value: "FF"
+    initial_value: "FF:FF:FF:FF:FF:FF"
     restore_value: true
-    min_length: 2
-    max_length: 2
-
-  - platform: template
-    name: "Motor Controller MAC Byte 1"
-    id: motor_mac_1
-    entity_category: config
-    mode: text
-    optimistic: true
-    initial_value: "FF"
-    restore_value: true
-    min_length: 2
-    max_length: 2
-
-  - platform: template
-    name: "Motor Controller MAC Byte 2"
-    id: motor_mac_2
-    entity_category: config
-    mode: text
-    optimistic: true
-    initial_value: "FF"
-    restore_value: true
-    min_length: 2
-    max_length: 2
-
-  - platform: template
-    name: "Motor Controller MAC Byte 3"
-    id: motor_mac_3
-    entity_category: config
-    mode: text
-    optimistic: true
-    initial_value: "FF"
-    restore_value: true
-    min_length: 2
-    max_length: 2
-
-  - platform: template
-    name: "Motor Controller MAC Byte 4"
-    id: motor_mac_4
-    entity_category: config
-    mode: text
-    optimistic: true
-    initial_value: "FF"
-    restore_value: true
-    min_length: 2
-    max_length: 2
-
-  - platform: template
-    name: "Motor Controller MAC Byte 5"
-    id: motor_mac_5
-    entity_category: config
-    mode: text
-    optimistic: true
-    initial_value: "FF"
-    restore_value: true
-    min_length: 2
-    max_length: 2
+    min_length: 17
+    max_length: 17
+    icon: "mdi:identifier"
 
 globals:
   - id: fan_mode_state

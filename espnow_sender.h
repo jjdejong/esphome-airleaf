@@ -26,6 +26,24 @@ uint8_t hexToByte(const std::string& hex) {
   return (uint8_t)strtol(hex.c_str(), nullptr, 16);
 }
 
+// Parse MAC address from "AA:BB:CC:DD:EE:FF" format
+bool parseMacAddress(const std::string& mac_str, uint8_t* mac_array) {
+  if (mac_str.length() != 17) {
+    return false;
+  }
+
+  for (int i = 0; i < 6; i++) {
+    int pos = i * 3;
+    if (i > 0 && mac_str[pos - 1] != ':') {
+      return false;
+    }
+    std::string byte_hex = mac_str.substr(pos, 2);
+    mac_array[i] = hexToByte(byte_hex);
+  }
+
+  return true;
+}
+
 class ESPNowSender : public Component {
  private:
   bool espnow_initialized = false;
@@ -34,19 +52,18 @@ class ESPNowSender : public Component {
 
  public:
   void setup() override {
-    // Only initialize if motor controller is enabled
+    // Only initialize if slave motor controller is enabled
     if (!id(motor_controller_enabled).state) {
-      ESP_LOGI("espnow", "Motor controller disabled - ESP-NOW not initialized");
+      ESP_LOGI("espnow", "Slave motor controller disabled - ESP-NOW not initialized");
       return;
     }
 
-    // Build MAC address from text inputs
-    motorControllerMac[0] = hexToByte(id(motor_mac_0).state);
-    motorControllerMac[1] = hexToByte(id(motor_mac_1).state);
-    motorControllerMac[2] = hexToByte(id(motor_mac_2).state);
-    motorControllerMac[3] = hexToByte(id(motor_mac_3).state);
-    motorControllerMac[4] = hexToByte(id(motor_mac_4).state);
-    motorControllerMac[5] = hexToByte(id(motor_mac_5).state);
+    // Parse MAC address from single text field
+    std::string mac_str = id(motor_controller_mac).state;
+    if (!parseMacAddress(mac_str, motorControllerMac)) {
+      ESP_LOGE("espnow", "Invalid MAC address format: %s (expected AA:BB:CC:DD:EE:FF)", mac_str.c_str());
+      return;
+    }
 
     // Check if MAC is all FF (unconfigured)
     bool mac_configured = false;
@@ -58,7 +75,7 @@ class ESPNowSender : public Component {
     }
 
     if (!mac_configured) {
-      ESP_LOGW("espnow", "Motor controller MAC not configured (all FF) - ESP-NOW not initialized");
+      ESP_LOGW("espnow", "Slave motor controller MAC not configured (all FF) - ESP-NOW not initialized");
       return;
     }
 
@@ -74,15 +91,15 @@ class ESPNowSender : public Component {
     esp_now_register_send_cb(OnDataSent);
     espnow_initialized = true;
 
-    // Add motor controller as peer
+    // Add slave motor controller as peer
     int result = esp_now_add_peer(motorControllerMac, ESP_NOW_ROLE_COMBO, 1, NULL, 0);
     if (result == 0) {
       peer_added = true;
-      ESP_LOGI("espnow", "Motor controller peer added: %02X:%02X:%02X:%02X:%02X:%02X",
+      ESP_LOGI("espnow", "Slave motor controller peer added: %02X:%02X:%02X:%02X:%02X:%02X",
                motorControllerMac[0], motorControllerMac[1], motorControllerMac[2],
                motorControllerMac[3], motorControllerMac[4], motorControllerMac[5]);
     } else {
-      ESP_LOGE("espnow", "Failed to add motor controller peer (error %d)", result);
+      ESP_LOGE("espnow", "Failed to add slave motor controller peer (error %d)", result);
     }
 
     // Print this device's MAC address
@@ -95,7 +112,7 @@ class ESPNowSender : public Component {
   }
 
   void loop() override {
-    // Only send if motor controller is enabled and ESP-NOW is initialized
+    // Only send if slave motor controller is enabled and ESP-NOW is initialized
     if (!id(motor_controller_enabled).state || !espnow_initialized || !peer_added) {
       return;
     }
