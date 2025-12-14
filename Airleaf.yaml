@@ -189,15 +189,6 @@ sensor:
     name: rssi
     update_interval: 60s
 
-  # Motor RPM feedback from ESP-NOW
-  - platform: template
-    name: "Motor RPM Feedback"
-    id: motor_rpm_feedback
-    unit_of_measurement: 'RPM'
-    accuracy_decimals: 0
-    icon: "mdi:speedometer"
-    state_class: measurement
-
   # Register 000: T1 - Air temperature
   - platform: modbus_controller
     name: Air Temperature

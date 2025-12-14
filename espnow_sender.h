@@ -11,7 +11,6 @@ typedef struct struct_message {
 } struct_message;
 
 struct_message outgoingData;
-struct_message incomingData;
 
 // Motor controller MAC address - UPDATE THIS AFTER FLASHING MOTOR CONTROLLER
 // Get the MAC from motor controller's logs and update here
@@ -26,16 +25,6 @@ void OnDataSent(uint8_t *mac_addr, uint8_t sendStatus) {
   }
 }
 
-// Callback when RPM feedback is received
-void OnDataRecv(uint8_t *mac_addr, uint8_t *data, uint8_t data_len) {
-  memcpy(&incomingData, data, sizeof(incomingData));
-
-  ESP_LOGD("espnow", "Received motor RPM: %.0f", incomingData.speed_setpoint);
-
-  // Update RPM feedback sensor
-  id(motor_rpm_feedback).publish_state(incomingData.speed_setpoint);
-}
-
 class ESPNowSender : public Component {
  public:
   void setup() override {
@@ -47,9 +36,8 @@ class ESPNowSender : public Component {
       return;
     }
 
-    esp_now_set_self_role(ESP_NOW_ROLE_COMBO);
+    esp_now_set_self_role(ESP_NOW_ROLE_SLAVE);
     esp_now_register_send_cb(OnDataSent);
-    esp_now_register_recv_cb(OnDataRecv);
 
     // Add motor controller as peer
     esp_now_add_peer(motorControllerMac, ESP_NOW_ROLE_COMBO, 1, NULL, 0);

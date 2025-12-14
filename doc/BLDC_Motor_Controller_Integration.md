@@ -73,15 +73,16 @@ typedef struct struct_message {
 ### Communication Flow
 
 1. **Airleaf → Motor Controller**: Target RPM setpoint from Airleaf's "Fan speed" sensor (register 015)
-2. **Motor Controller → Airleaf**: Actual motor RPM feedback from tachometer
-3. Update interval: ~1 second for RPM feedback, updates when RPM changes >5 RPM for setpoint
+2. **Motor Controller → Home Assistant**: Actual motor RPM sent directly via WiFi/API
+3. Update interval: Updates when RPM changes >5 RPM for setpoint transmission
 
 ### Speed Control Architecture
 
-The system uses **direct RPM communication** with **adjustable open-loop mapping**:
+The system uses **one-way RPM communication** with **adjustable open-loop mapping**:
 
-- **Airleaf controller** reads its internal fan speed (RPM) and sends this value directly via ESP-NOW
+- **Airleaf controller** reads its internal fan speed (RPM) and sends this value via ESP-NOW
 - **Motor controller** receives target RPM and converts it to PWM using an adjustable multiplier
+- **Motor controller** reports actual RPM directly to Home Assistant via WiFi/API
 - **Adjustable mapping** allows manual calibration based on actual motor performance
 - **Future ready** for closed-loop PID control using target vs. actual RPM feedback
 
@@ -375,23 +376,7 @@ esphome:
     - espnow_sender.h
 ```
 
-#### 2. Add RPM feedback sensor
-
-```yaml
-sensor:
-  # ... existing sensors ...
-
-  # Motor RPM feedback from ESP-NOW
-  - platform: template
-    name: "Motor RPM Feedback"
-    id: motor_rpm_feedback
-    unit_of_measurement: 'RPM'
-    accuracy_decimals: 0
-    icon: "mdi:speedometer"
-    state_class: measurement
-```
-
-#### 3. Add global variables and custom component
+#### 2. Add global variables and custom component
 
 ```yaml
 globals:
@@ -428,7 +413,6 @@ typedef struct struct_message {
 } struct_message;
 
 struct_message outgoingData;
-struct_message incomingData;
 
 // Motor controller MAC address - UPDATE THIS AFTER FLASHING MOTOR CONTROLLER
 // Get the MAC from motor controller's logs and update here
@@ -443,30 +427,19 @@ void OnDataSent(uint8_t *mac_addr, uint8_t sendStatus) {
   }
 }
 
-// Callback when RPM feedback is received
-void OnDataRecv(uint8_t *mac_addr, uint8_t *data, uint8_t data_len) {
-  memcpy(&incomingData, data, sizeof(incomingData));
-  
-  ESP_LOGD("espnow", "Received motor RPM: %.0f", incomingData.speed_setpoint);
-  
-  // Update RPM feedback sensor
-  id(motor_rpm_feedback).publish_state(incomingData.speed_setpoint);
-}
-
 class ESPNowSender : public Component {
  public:
   void setup() override {
     // Set WiFi channel (must match receiver)
     wifi_set_channel(1);
-    
+
     if (esp_now_init() != 0) {
       ESP_LOGE("espnow", "Error initializing ESP-NOW");
       return;
     }
-    
-    esp_now_set_self_role(ESP_NOW_ROLE_COMBO);
+
+    esp_now_set_self_role(ESP_NOW_ROLE_SLAVE);
     esp_now_register_send_cb(OnDataSent);
-    esp_now_register_recv_cb(OnDataRecv);
     
     // Add motor controller as peer
     esp_now_add_peer(motorControllerMac, ESP_NOW_ROLE_COMBO, 1, NULL, 0);
