@@ -260,271 +260,10 @@ sensor:
     state_class: total_increasing
     value_type: U_WORD
 
-# Binary sensors for status flags (Register 104: STAT)
-binary_sensor:
-  # Bit 0: Mod. Raff. (Cooling mode active)
-  - platform: modbus_controller
-    name: Cooling Mode Active
-    icon: "mdi:snowflake"
-    entity_category: diagnostic
-    register_type: read
-    address: 104
-    bitmask: 0x0001
-
-  # Bit 1: Mod. Risc. (Heating mode active)
-  - platform: modbus_controller
-    name: Heating Mode Active
-    icon: "mdi:fire"
-    entity_category: diagnostic
-    register_type: read
-    address: 104
-    bitmask: 0x0002
-
-  # Bit 4: F.V. H2 (Fan stop water not suitable on H2)
-  - platform: modbus_controller
-    name: Fan Stop H2 Water Issue
-    icon: "mdi:fan-off"
-    entity_category: diagnostic
-    device_class: problem
-    register_type: read
-    address: 104
-    bitmask: 0x0010
-
-  # Bit 5: F.V. H4 (Fan stop water not suitable on H4)
-  - platform: modbus_controller
-    name: Fan Stop H4 Water Issue
-    icon: "mdi:fan-off"
-    entity_category: diagnostic
-    device_class: problem
-    register_type: read
-    address: 104
-    bitmask: 0x0020
-
-  # Bit 6: B.A. (Stop for unsuitable water - 45 min standby)
-  - platform: modbus_controller
-    name: Bad Water Standby
-    icon: "mdi:water-alert"
-    entity_category: diagnostic
-    device_class: problem
-    register_type: read
-    address: 104
-    bitmask: 0x0040
-
-  # Bit 8: Antig. (Device in antifreeze mode)
-  - platform: modbus_controller
-    name: Antifreeze Mode
-    icon: "mdi:snowflake-alert"
-    entity_category: diagnostic
-    register_type: read
-    address: 104
-    bitmask: 0x0100
-
-  # Bit 9: Alrm (At least one alarm present)
-  - platform: modbus_controller
-    name: Alarm Present
-    icon: "mdi:alert"
-    entity_category: diagnostic
-    device_class: problem
-    register_type: read
-    address: 104
-    bitmask: 0x0200
-
-  # Bit 10: Test (Instrument in test mode)
-  - platform: modbus_controller
-    name: Test Mode
-    icon: "mdi:test-tube"
-    entity_category: diagnostic
-    register_type: read
-    address: 104
-    bitmask: 0x0400
-
-  # Bit 11: Stby (Device in standby)
-  - platform: modbus_controller
-    name: Standby Mode
-    icon: "mdi:power-standby"
-    entity_category: diagnostic
-    register_type: read
-    address: 104
-    bitmask: 0x0800
-
-  # Bit 12: Com err (Timeout master - 300 sec)
-  - platform: modbus_controller
-    name: Communication Error
-    icon: "mdi:lan-disconnect"
-    entity_category: diagnostic
-    device_class: problem
-    register_type: read
-    address: 104
-    bitmask: 0x1000
-
-  # Bit 13: H2 asnt (H2 probe absent on startup)
-  - platform: modbus_controller
-    name: H2 Probe Absent
-    icon: "mdi:thermometer-off"
-    entity_category: diagnostic
-    device_class: problem
-    register_type: read
-    address: 104
-    bitmask: 0x2000
-
-  # Bit 14: H4 asnt (H4 probe absent on startup)
-  - platform: modbus_controller
-    name: H4 Probe Absent
-    icon: "mdi:thermometer-off"
-    entity_category: diagnostic
-    device_class: problem
-    register_type: read
-    address: 104
-    bitmask: 0x4000
-
-  # Binary sensors for alarm flags (Register 105: ALR_STAT)
-  # Bit 0: Com. (Communication error)
-  - platform: modbus_controller
-    name: Alarm Communication Error
-    icon: "mdi:lan-disconnect"
-    entity_category: diagnostic
-    device_class: problem
-    register_type: read
-    address: 105
-    bitmask: 0x0001
-
-  # Bit 1: AIR (AIR probe alarm)
-  - platform: modbus_controller
-    name: Alarm AIR Probe
-    icon: "mdi:thermometer-alert"
-    entity_category: diagnostic
-    device_class: problem
-    register_type: read
-    address: 105
-    bitmask: 0x0002
-
-  # Bit 2: H4 (H4 probe alarm)
-  - platform: modbus_controller
-    name: Alarm H4 Probe
-    icon: "mdi:thermometer-alert"
-    entity_category: diagnostic
-    device_class: problem
-    register_type: read
-    address: 105
-    bitmask: 0x0004
-
-  # Bit 3: Acq. Dan. (Block for harmful water)
-  - platform: modbus_controller
-    name: Alarm Harmful Water
-    icon: "mdi:water-alert"
-    entity_category: diagnostic
-    device_class: problem
-    register_type: read
-    address: 105
-    bitmask: 0x0008
-
-  # Bit 4: H2 (H2 probe alarm)
-  - platform: modbus_controller
-    name: Alarm H2 Probe
-    icon: "mdi:thermometer-alert"
-    entity_category: diagnostic
-    device_class: problem
-    register_type: read
-    address: 105
-    bitmask: 0x0010
-
-  # Bit 5: H4 n. id (Coil hot water temperature not suitable)
-  - platform: modbus_controller
-    name: Alarm H4 Water Temp Not Suitable
-    icon: "mdi:water-thermometer-outline"
-    entity_category: diagnostic
-    device_class: problem
-    register_type: read
-    address: 105
-    bitmask: 0x0020
-
-  # Bit 6: Hi Res (High temperature resistance)
-  - platform: modbus_controller
-    name: Alarm High Resistance
-    icon: "mdi:resistor"
-    entity_category: diagnostic
-    device_class: problem
-    register_type: read
-    address: 105
-    bitmask: 0x0040
-
-  # Bit 7: Mot. (Motor fault)
-  - platform: modbus_controller
-    name: Alarm Motor Fault
-    icon: "mdi:engine-off-outline"
-    entity_category: diagnostic
-    device_class: problem
-    register_type: read
-    address: 105
-    bitmask: 0x0080
-
-  # Bit 8: GRID (GRID contact open)
-  - platform: modbus_controller
-    name: Alarm Grid Contact
-    icon: "mdi:power-plug-off"
-    entity_category: diagnostic
-    device_class: problem
-    register_type: read
-    address: 105
-    bitmask: 0x0100
-
-  # Bit 9: H2 n. id (Main coil water temperature not suitable)
-  - platform: modbus_controller
-    name: Alarm H2 Water Temp Not Suitable
-    icon: "mdi:water-thermometer-outline"
-    entity_category: diagnostic
-    device_class: problem
-    register_type: read
-    address: 105
-    bitmask: 0x0200
-
-  # Bit 10: Filter (Maintenance required - dirty filter)
-  - platform: modbus_controller
-    name: Alarm Filter Maintenance
-    icon: "mdi:air-filter"
-    entity_category: diagnostic
-    device_class: problem
-    register_type: read
-    address: 105
-    bitmask: 0x0400
-
-  # Binary sensors for relay outputs (Register 009: OUT)
-  # Bit 0: EV1 relay
-  - platform: modbus_controller
-    name: Relay EV1
-    icon: "mdi:electric-switch"
-    entity_category: diagnostic
-    register_type: read
-    address: 9
-    bitmask: 0x0001
-
-  # Bit 1: EV2 relay
-  - platform: modbus_controller
-    name: Relay EV2
-    icon: "mdi:electric-switch"
-    entity_category: diagnostic
-    register_type: read
-    address: 9
-    bitmask: 0x0002
-
-  # Bit 2: CHILLER relay
-  - platform: modbus_controller
-    name: Relay Chiller
-    icon: "mdi:snowflake"
-    entity_category: diagnostic
-    register_type: read
-    address: 9
-    bitmask: 0x0004
-
-  # Bit 3: BOILER relay
-  - platform: modbus_controller
-    name: Relay Boiler
-    icon: "mdi:fire"
-    entity_category: diagnostic
-    register_type: read
-    address: 9
-    bitmask: 0x0008
-
+# Binary sensors - Individual status sensors removed, see consolidated text sensors:
+# - "System Status" (Register 104)
+# - "Active Alarms" (Register 105)
+# - "Relay Status" (Register 9)
 number:
   # Register 231: SP - Absolute setpoint value
   - platform: modbus_controller
@@ -937,11 +676,15 @@ text:
     entity_category: config
     mode: text
     optimistic: true
-    initial_value: "FF:FF:FF:FF:FF:FF"
+    initial_value: "C8:C9:A3:6A:D6:0C"
     restore_value: true
     min_length: 17
     max_length: 17
     icon: "mdi:identifier"
+    on_value:
+      - lambda: |-
+          // Force ESP-NOW re-initialization when MAC changes
+          ESP_LOGI("config", "MAC address changed to: %s", x.c_str());
 
 text_sensor:
   # ESP-NOW send status for diagnostics
@@ -950,6 +693,104 @@ text_sensor:
     id: espnow_send_status
     icon: "mdi:access-point-network"
     entity_category: diagnostic
+
+  # Consolidated System Status (Register 104: STAT)
+  - platform: modbus_controller
+    name: "System Status"
+    id: system_status
+    icon: "mdi:information-outline"
+    entity_category: diagnostic
+    modbus_controller_id: airleaf
+    register_type: read
+    address: 104
+    raw_encode: HEXBYTES
+    lambda: |-
+      uint16_t value = modbus_controller::word_from_hex_str(x, 0);
+      std::string status = "";
+
+      // Operating mode
+      if (value & 0x0001) status += "Cooling, ";
+      else if (value & 0x0002) status += "Heating, ";
+      else if (value & 0x0800) status += "Standby, ";
+      else status += "Idle, ";
+
+      // Special modes
+      if (value & 0x0100) status += "Antifreeze, ";
+      if (value & 0x0400) status += "Test Mode, ";
+
+      // Issues
+      if (value & 0x0010) status += "Fan Stop H2, ";
+      if (value & 0x0020) status += "Fan Stop H4, ";
+      if (value & 0x0040) status += "Bad Water Standby, ";
+      if (value & 0x1000) status += "Comm Error, ";
+      if (value & 0x2000) status += "H2 Probe Missing, ";
+      if (value & 0x4000) status += "H4 Probe Missing, ";
+
+      // Alarm indicator
+      if (value & 0x0200) status += "ALARM ACTIVE, ";
+
+      // Remove trailing comma and space
+      if (status.length() > 2) status = status.substr(0, status.length() - 2);
+      if (status.empty()) status = "OK";
+
+      return status;
+
+  # Consolidated Active Alarms (Register 105: ALR_STAT)
+  - platform: modbus_controller
+    name: "Active Alarms"
+    id: active_alarms
+    icon: "mdi:alert-circle"
+    entity_category: diagnostic
+    modbus_controller_id: airleaf
+    register_type: read
+    address: 105
+    raw_encode: HEXBYTES
+    lambda: |-
+      uint16_t value = modbus_controller::word_from_hex_str(x, 0);
+      std::string alarms = "";
+
+      if (value & 0x0001) alarms += "Communication, ";
+      if (value & 0x0002) alarms += "AIR Probe, ";
+      if (value & 0x0004) alarms += "H4 Probe, ";
+      if (value & 0x0008) alarms += "Harmful Water, ";
+      if (value & 0x0010) alarms += "H2 Probe, ";
+      if (value & 0x0020) alarms += "H4 Water Temp, ";
+      if (value & 0x0040) alarms += "High Resistance, ";
+      if (value & 0x0080) alarms += "Motor Fault, ";
+      if (value & 0x0100) alarms += "Grid Contact, ";
+      if (value & 0x0200) alarms += "H2 Water Temp, ";
+      if (value & 0x0400) alarms += "Filter Maintenance, ";
+
+      // Remove trailing comma and space
+      if (alarms.length() > 2) alarms = alarms.substr(0, alarms.length() - 2);
+      if (alarms.empty()) alarms = "None";
+
+      return alarms;
+
+  # Consolidated Relay Status (Register 9: OUT)
+  - platform: modbus_controller
+    name: "Relay Status"
+    id: relay_status
+    icon: "mdi:electric-switch"
+    entity_category: diagnostic
+    modbus_controller_id: airleaf
+    register_type: read
+    address: 9
+    raw_encode: HEXBYTES
+    lambda: |-
+      uint16_t value = modbus_controller::word_from_hex_str(x, 0);
+      std::string relays = "";
+
+      if (value & 0x0001) relays += "EV1, ";
+      if (value & 0x0002) relays += "EV2, ";
+      if (value & 0x0004) relays += "Chiller, ";
+      if (value & 0x0008) relays += "Boiler, ";
+
+      // Remove trailing comma and space
+      if (relays.length() > 2) relays = relays.substr(0, relays.length() - 2);
+      if (relays.empty()) relays = "None Active";
+
+      return relays;
 
 globals:
   - id: fan_mode_state

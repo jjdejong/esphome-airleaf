@@ -112,7 +112,7 @@ void attempt_espnow_init() {
   if (result == 0) {
     peer_added = true;
     char status_msg[64];
-    snprintf(status_msg, sizeof(status_msg), "Ready - Target: %02X:%02X:%02X:%02X:%02X:%02X",
+    snprintf(status_msg, sizeof(status_msg), "Ready: %02X:%02X:%02X:%02X:%02X:%02X",
              motorControllerMac[0], motorControllerMac[1], motorControllerMac[2],
              motorControllerMac[3], motorControllerMac[4], motorControllerMac[5]);
     id(espnow_send_status).publish_state(status_msg);

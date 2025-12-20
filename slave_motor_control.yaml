@@ -79,26 +79,11 @@ sensor:
     state_class: measurement
 
 text_sensor:
-  # Master controller MAC address
+  # Consolidated ESP-NOW status with MAC and connection state
   - platform: template
-    name: "Master Controller MAC"
-    id: master_mac_address
-    icon: "mdi:network"
-    entity_category: diagnostic
-
-  # ESP-NOW connection status
-  - platform: template
-    name: "ESP-NOW Connection"
-    id: espnow_connection_status
-    icon: "mdi:connection"
-    entity_category: diagnostic
-
-binary_sensor:
-  # Connection active indicator (updated when data received)
-  - platform: template
-    name: "Master Connected"
-    id: master_connected
-    device_class: connectivity
+    name: "ESP-NOW Status"
+    id: espnow_status
+    icon: "mdi:access-point-network"
     entity_category: diagnostic
 
 number:

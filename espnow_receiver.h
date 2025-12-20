@@ -26,15 +26,11 @@ void OnDataRecv(uint8_t *mac_addr, uint8_t *data, uint8_t data_len) {
   // Store sender MAC for sending RPM feedback
   memcpy(id(sender_mac), mac_addr, 6);
 
-  // Update master MAC address display
-  char mac_str[18];
-  snprintf(mac_str, sizeof(mac_str), "%02X:%02X:%02X:%02X:%02X:%02X",
+  // Update consolidated status: "Connected: C8:C9:A3:6A:D5:45"
+  char status_msg[64];
+  snprintf(status_msg, sizeof(status_msg), "Connected: %02X:%02X:%02X:%02X:%02X:%02X",
            mac_addr[0], mac_addr[1], mac_addr[2], mac_addr[3], mac_addr[4], mac_addr[5]);
-  id(master_mac_address).publish_state(mac_str);
-
-  // Update connection status
-  id(espnow_connection_status).publish_state("Connected");
-  id(master_connected).publish_state(true);
+  id(espnow_status).publish_state(status_msg);
 
   // Update last received time for timeout detection
   lastRecvTime = millis();
@@ -80,15 +76,14 @@ void espnow_receiver_init() {
 
   if (esp_now_init() != 0) {
     ESP_LOGE("espnow", "Error initializing ESP-NOW");
-    id(espnow_connection_status).publish_state("Init Failed");
+    id(espnow_status).publish_state("Init Failed");
     return;
   }
 
   esp_now_set_self_role(ESP_NOW_ROLE_COMBO);
   esp_now_register_recv_cb(OnDataRecv);
 
-  id(espnow_connection_status).publish_state("Waiting for Master");
-  id(master_connected).publish_state(false);
+  id(espnow_status).publish_state("Waiting for Master");
 }
 
 void espnow_receiver_loop() {
@@ -101,8 +96,7 @@ void espnow_receiver_loop() {
   static bool was_connected = false;
   if (lastRecvTime > 0 && (currentTime - lastRecvTime > 10000)) {
     if (was_connected) {
-      id(espnow_connection_status).publish_state("Connection Lost");
-      id(master_connected).publish_state(false);
+      id(espnow_status).publish_state("Disconnected (Timeout)");
       was_connected = false;
     }
   } else if (lastRecvTime > 0) {
