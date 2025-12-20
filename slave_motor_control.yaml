@@ -1,13 +1,7 @@
 esphome:
-  name: motor-controller
+  name: airleaf-motor-01
   includes:
     - espnow_receiver.h
-  on_boot:
-    priority: -100
-    then:
-      - lambda: |-
-          static ESPNowComponent* espnow_comp = new ESPNowComponent();
-          App.register_component(espnow_comp);
 
 esp8266:
   board: d1_mini
@@ -84,6 +78,29 @@ sensor:
     icon: "mdi:percent"
     state_class: measurement
 
+text_sensor:
+  # Master controller MAC address
+  - platform: template
+    name: "Master Controller MAC"
+    id: master_mac_address
+    icon: "mdi:network"
+    entity_category: diagnostic
+
+  # ESP-NOW connection status
+  - platform: template
+    name: "ESP-NOW Connection"
+    id: espnow_connection_status
+    icon: "mdi:connection"
+    entity_category: diagnostic
+
+binary_sensor:
+  # Connection active indicator (updated when data received)
+  - platform: template
+    name: "Master Connected"
+    id: master_connected
+    device_class: connectivity
+    entity_category: diagnostic
+
 number:
   # RPM to PWM percentage mapping multiplier
   - platform: template
@@ -124,3 +141,10 @@ globals:
   - id: sender_mac
     type: uint8_t[6]
     restore_value: no
+
+# ESP-NOW receiver loop
+interval:
+  - interval: 5s
+    then:
+      - lambda: |-
+          espnow_receiver_loop();

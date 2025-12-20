@@ -7,12 +7,6 @@ esphome:
   name: $devicename
   includes:
     - espnow_sender.h
-  on_boot:
-    priority: -100
-    then:
-      - lambda: |-
-          static ESPNowSender* espnow_sender = new ESPNowSender();
-          App.register_component(espnow_sender);
 
 esp8266:
   board: d1_mini
@@ -949,7 +943,22 @@ text:
     max_length: 17
     icon: "mdi:identifier"
 
+text_sensor:
+  # ESP-NOW send status for diagnostics
+  - platform: template
+    name: "ESP-NOW Status"
+    id: espnow_send_status
+    icon: "mdi:access-point-network"
+    entity_category: diagnostic
+
 globals:
   - id: fan_mode_state
     type: std::string
     #initial_value: "Auto"
+
+# ESP-NOW sender loop
+interval:
+  - interval: 5s
+    then:
+      - lambda: |-
+          espnow_loop();
