@@ -87,22 +87,8 @@ text_sensor:
     entity_category: diagnostic
 
 number:
-  # RPM to PWM percentage mapping multiplier
-  - platform: template
-    name: "Speed Mapping Multiplier"
-    id: speed_mapping_multiplier
-    min_value: 0.01
-    max_value: 0.10
-    step: 0.001
-    initial_value: 0.05
-    mode: box
-    optimistic: true
-    icon: "mdi:tune"
-    unit_of_measurement: "%/RPM"
-    entity_category: config
-    restore_value: true
-
-  # Maximum RPM reference for percentage calculation
+  # Maximum RPM reference for PWM percentage calculation
+  # 100% PWM duty cycle = this RPM value
   - platform: template
     name: "Max RPM Reference"
     id: max_rpm_reference

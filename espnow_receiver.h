@@ -38,15 +38,11 @@ void OnDataRecv(uint8_t *mac_addr, uint8_t *data, uint8_t data_len) {
   // Update target RPM sensor
   id(target_rpm_setpoint) = (int)target_rpm;
 
-  // Adjustable RPM to PWM percentage mapping
-  // Method 1: Use multiplier (default: 0.05 %/RPM)
-  // speed_percent = target_rpm * multiplier
-  float multiplier = id(speed_mapping_multiplier).state;
-  float speed_percent = target_rpm * multiplier;
-
-  // Alternative method: Use max RPM reference (commented out)
-  // float max_rpm = id(max_rpm_reference).state;
-  // float speed_percent = (target_rpm / max_rpm) * 100.0;
+  // Calculate PWM percentage based on max RPM reference
+  // 100% PWM = max_rpm value
+  // Formula: PWM% = (current_RPM / max_rpm) * 100
+  float max_rpm = id(max_rpm_reference).state;
+  float speed_percent = (target_rpm / max_rpm) * 100.0;
 
   // Clamp to 0-100%
   if (speed_percent < 0) speed_percent = 0;
