@@ -65,14 +65,21 @@ This isolation allows safe direct connection of 3.3V Wemos logic to the control 
 
 The F-PWM pin accepts either:
 1. **Analog voltage**: 0-6V DC (potentiometer mode shown in board documentation)
-2. **PWM signal**: Digital pulses filtered to equivalent analog voltage
+2. **PWM signal**: Digital pulses controlling motor speed via duty cycle
 
-When using PWM from ESP8266 (0-3.3V output):
-- 0% duty cycle → 0V → Motor stopped
-- 50% duty cycle → ~1.65V → ~27% motor speed
-- 100% duty cycle → ~3.3V → ~55% motor speed
+### Optocoupler Operation
 
-The board includes an RC filter that converts PWM pulses to averaged DC voltage. The 3.3V maximum from ESP8266 limits the achievable motor speed to approximately 55% of full capability. For full-range control, a voltage level shifter to 0-6V would be required.
+The control board uses an optocoupler for galvanic isolation:
+- **Input side**: ESP8266 3.3V PWM signal activates the optocoupler LED
+- **Output side**: Isolated transistor switches the board's internal control voltage
+- **Key advantage**: PWM duty cycle directly controls motor speed regardless of input voltage level
+
+When using PWM from ESP8266 (3.3V logic):
+- 0% duty cycle → Optocoupler always OFF → Motor stopped
+- 50% duty cycle → Optocoupler switches 50% of time → ~50% motor speed
+- 100% duty cycle → Optocoupler always ON → Full motor speed
+
+**Important**: The 3.3V ESP8266 output is sufficient to fully activate the optocoupler. There is **no inherent speed limitation** from using 3.3V logic levels. The optocoupler provides both isolation and voltage level adaptation, allowing full motor speed range control (0-100%).
 
 ## ESP-NOW Communication Protocol
 
@@ -108,7 +115,7 @@ The complete motor controller configuration is available in the repository at:
 
 ### PWM Configuration
 - Frequency: 1000 Hz (adjustable based on motor response)
-- Output range: 0-3.3V (limits motor to ~55% of maximum speed)
+- Output voltage: 0-3.3V (sufficient to activate optocoupler for full speed range)
 
 ### Tachometer Calibration
 The `multiply` filter value in the pulse counter sensor requires calibration:
@@ -460,16 +467,16 @@ Using the 5-pin KF2EDGR-3.96 motor connector:
 
 Different motors may respond better to different PWM frequencies. The default 1000 Hz (1 kHz) works for most applications, but you can experiment with values between 500Hz and 25kHz in the motor controller configuration file. Higher frequencies produce smoother DC voltage from the RC filter but may increase switching losses.
 
-### Voltage Level Shifting for Full Speed Range
+### Alternative: Analog Voltage Control
 
-To achieve full motor speed range (0-100% instead of 0-55%), add a voltage level shifter circuit between the Wemos and the F-PWM input. A simple transistor-based level shifter can scale the 0-3.3V output from the Wemos to 0-6V:
+While the PWM approach with optocoupler provides full 0-100% speed range, some users may prefer direct analog voltage control. This requires a voltage level shifter to convert the ESP8266's 0-3.3V output to the board's 0-6V analog input range:
 
 **Components needed:**
 - NPN transistor: 2N2222 or similar
 - Two 10kΩ resistors
 - 6V regulator (LM7806) powered from board's 12V supply
 
-The level shifter inverts and amplifies the PWM signal to provide full voltage range control.
+Note: This is **optional** and not recommended for the standard PWM implementation, which already provides full speed control via the optocoupler.
 
 ### Enhanced Monitoring
 
@@ -519,7 +526,7 @@ See the repository configuration files for implementation examples.
 ### Motor Control
 
 - **Speed Resolution**: 1% (0-100 steps via PWM duty cycle)
-- **Actual Speed Range**: 0-55% of motor maximum (due to 3.3V PWM output)
+- **Actual Speed Range**: 0-100% of motor maximum (full range via optocoupler)
 - **Response Time**: 100-500ms depending on motor inertia
 - **RPM Feedback Accuracy**: ±5 RPM (after calibration)
 
