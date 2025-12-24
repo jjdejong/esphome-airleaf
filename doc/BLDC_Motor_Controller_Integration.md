@@ -18,6 +18,23 @@ This document describes the integration of a 5-wire 310V variable frequency brus
    
 3. **Wemos Device #2 (Airleaf Controller)**: Sends speed setpoints and receives RPM feedback
 
+### Motor and Control Connectors
+
+**Motor Connector (5-pin):**
+- **Type**: KF2EDGR-3.96-5P (3.96mm pitch pluggable terminal block)
+- **Alternative names**: KF396, DG396 connector
+- **Pitch**: 3.96mm center-to-center spacing
+- **Current rating**: Typically 8-10A per pin
+- **Voltage rating**: 300V
+- **Wire gauge**: Accepts 22-16 AWG wire
+
+**Control Connector (4-pin):**
+- **Type**: XH2.54 (2.54mm pitch pluggable terminal block)
+- **Pitch**: 2.54mm (0.1" standard spacing)
+- **Current rating**: Typically 3A per pin
+- **Voltage rating**: 250V
+- **Wire gauge**: Accepts 26-22 AWG wire
+
 ### Signal Isolation
 
 The motor control board includes three optocouplers providing galvanic isolation:
@@ -29,36 +46,33 @@ This isolation allows safe direct connection of 3.3V Wemos logic to the control 
 
 ## Control Interface Pinout
 
-**4-pin Control Connector (2.54mm spacing):**
+**4-pin Control Connector:**
+- **Type**: XH2.54 / 2.54mm pitch pluggable terminal block
+- **Pitch**: 2.54mm (0.1" standard breadboard spacing)
+- **Current rating**: Typically 3A per pin
+- **Voltage rating**: 250V
 
-| Pin | Signal | Wire Color | Function | Connection |
-|-----|--------|------------|----------|------------|
-| 1 | GND | Red | Ground | Wemos GND |
-| 2 | +12V | Black | 12V 1.25A isolated supply | Buck converter input |
-| 3 | F-PWM | White | PWM/Analog speed control input | Wemos GPIO (PWM output) |
-| 4 | F-FG | Yellow | Tachometer pulse output | Wemos GPIO (pulse counter input) |
+| Pin | Signal | Wire Color | Function | Wemos Connection |
+|-----|--------|------------|----------|------------------|
+| 1 | GND | Black | Ground | GND |
+| 2 | +12V | Red | 12V 1.25A isolated supply | Via buck converter to 5V |
+| 3 | F-PWM | White | PWM/Analog speed control input | D5 (GPIO14) |
+| 4 | F-FG | Yellow | Tachometer pulse output | D6 (GPIO12) |
 
-**Note**: The unusual wire color convention (red for GND, black for +12V) must be verified before connection.
+**Note**: Standard wire color convention is used (black for GND, red for +12V).
 
 ## F-PWM Input Characteristics
 
 The F-PWM pin accepts either:
 1. **Analog voltage**: 0-6V DC (potentiometer mode shown in board documentation)
-2. **PWM signal**: Digital pulses switched by optocoupler
+2. **PWM signal**: Digital pulses filtered to equivalent analog voltage
 
-### Optocoupler Operation
+When using PWM from ESP8266 (0-3.3V output):
+- 0% duty cycle → 0V → Motor stopped
+- 50% duty cycle → ~1.65V → ~27% motor speed
+- 100% duty cycle → ~3.3V → ~55% motor speed
 
-The control board uses an optocoupler for galvanic isolation:
-- **Input side**: ESP8266 3.3V PWM signal activates the optocoupler LED
-- **Output side**: Isolated transistor switches the board's internal control voltage
-- **Key advantage**: PWM duty cycle is preserved regardless of input voltage level
-
-When using PWM from ESP8266 (3.3V logic):
-- 0% duty cycle → Optocoupler always OFF → Motor stopped
-- 50% duty cycle → Optocoupler switches 50% of time → ~50% motor speed
-- 100% duty cycle → Optocoupler always ON → ~100% motor speed
-
-**Important**: The 3.3V ESP8266 output is sufficient to fully activate the optocoupler. There is **no inherent speed limitation** from using 3.3V logic levels. The optocoupler provides both isolation and voltage level adaptation, allowing full motor speed range control.
+The board includes an RC filter that converts PWM pulses to averaged DC voltage. The 3.3V maximum from ESP8266 limits the achievable motor speed to approximately 55% of full capability. For full-range control, a voltage level shifter to 0-6V would be required.
 
 ## ESP-NOW Communication Protocol
 
@@ -66,508 +80,165 @@ When using PWM from ESP8266 (3.3V logic):
 
 ```cpp
 typedef struct struct_message {
-  float speed_setpoint;  // RPM value for both directions
+  float speed_setpoint;  // Speed percentage (0-100%) or RPM value
 } struct_message;
 ```
 
 ### Communication Flow
 
-1. **Airleaf → Motor Controller**: Target RPM setpoint from Airleaf's "Fan speed" sensor (register 015)
-2. **Motor Controller → Home Assistant**: Actual motor RPM sent directly via WiFi/API
-3. Update interval: Updates when RPM changes >5 RPM for setpoint transmission
-
-### Speed Control Architecture
-
-The system uses **one-way RPM communication** with **adjustable open-loop mapping**:
-
-- **Airleaf controller** reads its internal fan speed (RPM) and sends this value via ESP-NOW
-- **Motor controller** receives target RPM and converts it to PWM using an adjustable multiplier
-- **Motor controller** reports actual RPM directly to Home Assistant via WiFi/API
-- **Adjustable mapping** allows manual calibration based on actual motor performance
-- **Future ready** for closed-loop PID control using target vs. actual RPM feedback
+1. **Airleaf → Motor Controller**: Speed setpoint (0-100%)
+2. **Motor Controller → Airleaf**: Current RPM feedback
+3. Update interval: ~1 second for RPM feedback, immediate for setpoint changes
 
 ---
 
 ## Wemos #1: Motor Controller Configuration
 
-### File: `slave_motor_control.yaml`
+The complete motor controller configuration is available in the repository at:
+- `motor-controller/motor-controller.yaml` - Main ESPHome configuration
+- `motor-controller/espnow_receiver.h` - ESP-NOW receiver implementation
 
-```yaml
-esphome:
-  name: motor-controller
-  includes:
-    - espnow_receiver.h
-  on_boot:
-    priority: -100
-    then:
-      - lambda: |-
-          static ESPNowComponent* espnow_comp = new ESPNowComponent();
-          App.register_component(espnow_comp);
+**Key Configuration Points:**
 
-esp8266:
-  board: d1_mini
+### Hardware Connections
+- **PWM Output**: D5 (GPIO14) → F-PWM (white wire)
+- **Tachometer Input**: D6 (GPIO12) → F-FG (yellow wire)
+- **Ground**: GND → GND (black wire)
+- **Power**: 5V ← Buck converter ← +12V (red wire)
 
-wifi:
-  ssid: !secret wifi_ssid
-  password: !secret wifi_password
+### PWM Configuration
+- Frequency: 1000 Hz (adjustable based on motor response)
+- Output range: 0-3.3V (limits motor to ~55% of maximum speed)
 
-api:
+### Tachometer Calibration
+The `multiply` filter value in the pulse counter sensor requires calibration:
+- Formula: `60 / (pulses_per_revolution × update_interval_seconds)`
+- Default value: 30.0 (assumes 2 pulses/rev with 2s update interval)
+- Adjust after measuring actual motor RPM with external tachometer
 
-ota:
-  - platform: esphome
-    password: !secret ota_password
-
-logger:
-  level: DEBUG
-
-# PWM output for motor speed control
-output:
-  - platform: esp8266_pwm
-    pin: D5  # GPIO14 - white wire to F-PWM
-    frequency: 1000 Hz  # 1kHz PWM, adjust if needed
-    id: motor_pwm_output
-
-# Fan platform for motor control
-fan:
-  - platform: speed
-    output: motor_pwm_output
-    name: "BLDC Motor"
-    id: bldc_motor
-    restore_mode: RESTORE_DEFAULT_OFF
-
-# Tachometer pulse counter
-sensor:
-  - platform: pulse_counter
-    pin:
-      number: D6  # GPIO12 - yellow wire to F-FG
-      mode:
-        input: true
-        pullup: true
-    name: "Motor RPM"
-    id: motor_rpm
-    unit_of_measurement: 'RPM'
-    accuracy_decimals: 0
-    update_interval: 2s
-    count_mode:
-      rising_edge: INCREMENT
-      falling_edge: DISABLE
-    filters:
-      # Calibration: adjust multiplier based on motor's pulses per revolution
-      # Formula: 60 / (pulses_per_revolution * update_interval_seconds)
-      # Example: For 2 pulses/rev with 2s update: 60 / (2 * 2) = 15
-      - multiply: 30.0
-      - sliding_window_moving_average:
-          window_size: 5
-          send_every: 1
-
-  # Target RPM setpoint from Airleaf controller
-  - platform: template
-    name: "Target RPM Setpoint"
-    id: target_rpm_setpoint_sensor
-    unit_of_measurement: 'RPM'
-    accuracy_decimals: 0
-    icon: "mdi:speedometer-slow"
-    lambda: "return id(target_rpm_setpoint);"
-    update_interval: 1s
-
-  # Calculated PWM percentage (for monitoring)
-  - platform: template
-    name: "Motor PWM Percentage"
-    id: motor_pwm_percent
-    unit_of_measurement: '%'
-    accuracy_decimals: 1
-    icon: "mdi:percent"
-    state_class: measurement
-
-number:
-  # RPM to PWM percentage mapping multiplier
-  - platform: template
-    name: "Speed Mapping Multiplier"
-    id: speed_mapping_multiplier
-    min_value: 0.01
-    max_value: 0.10
-    step: 0.001
-    initial_value: 0.05
-    mode: box
-    optimistic: true
-    icon: "mdi:tune"
-    unit_of_measurement: "%/RPM"
-    entity_category: config
-    restore_value: true
-
-  # Maximum RPM reference for percentage calculation
-  - platform: template
-    name: "Max RPM Reference"
-    id: max_rpm_reference
-    min_value: 500
-    max_value: 3000
-    step: 50
-    initial_value: 2000
-    mode: box
-    optimistic: true
-    icon: "mdi:speedometer"
-    unit_of_measurement: "RPM"
-    entity_category: config
-    restore_value: true
-
-# Global variables
-globals:
-  - id: target_rpm_setpoint
-    type: int
-    restore_value: no
-    initial_value: '0'
-  - id: sender_mac
-    type: uint8_t[6]
-    restore_value: no
-```
-
-**Note**: The custom component is registered via the `on_boot` hook in the `esphome:` block above.
-
-### Adjustable Speed Mapping
-
-The motor controller includes two configurable parameters for fine-tuning the RPM-to-PWM conversion:
-
-#### Speed Mapping Multiplier (Active Method)
-- **Formula**: `PWM% = Target_RPM × Multiplier`
-- **Default**: 0.05 %/RPM (gives 100% PWM at 2000 RPM)
-- **Range**: 0.01 to 0.10 %/RPM
-- **Adjustment**: Available in Home Assistant, persists across reboots
-
-**Calibration Example**:
-1. Airleaf commands 1000 RPM target
-2. Motor actually runs at 800 RPM (underspeed)
-3. Increase multiplier from 0.05 to 0.0625
-4. New PWM: 1000 × 0.0625 = 62.5% (was 50%)
-5. Motor should now reach closer to 1000 RPM
-
-#### Max RPM Reference (Alternative Method)
-- **Formula**: `PWM% = (Target_RPM / Max_RPM) × 100`
-- **Default**: 2000 RPM
-- **Range**: 500 to 3000 RPM
-- **Status**: Available but not currently active
-
-To switch to this percentage-based method, modify `espnow_receiver.h` lines 35-40 to use the commented alternative formula.
-
-#### Motor PWM Percentage Sensor
-- Displays the currently calculated PWM duty cycle
-- Updates in real-time as RPM setpoint changes
-- Useful for monitoring and diagnostic purposes
-
-### File: `espnow_receiver.h`
-
-Create this file in the same directory as `slave_motor_control.yaml`:
-
-```cpp
-#include "esphome.h"
-
-extern "C" {
-  #include <espnow.h>
-  #include <user_interface.h>
-}
-
-// Data structure for ESP-NOW communication
-typedef struct struct_message {
-  float speed_setpoint;  // RPM value for both directions
-} struct_message;
-
-struct_message incomingData;
-struct_message outgoingData;
-
-// Callback when data is received from Airleaf controller
-void OnDataRecv(uint8_t *mac_addr, uint8_t *data, uint8_t data_len) {
-  memcpy(&incomingData, data, sizeof(incomingData));
-
-  ESP_LOGD("espnow", "Received from %02X:%02X:%02X:%02X:%02X:%02X",
-           mac_addr[0], mac_addr[1], mac_addr[2], mac_addr[3], mac_addr[4], mac_addr[5]);
-
-  float target_rpm = incomingData.speed_setpoint;
-  ESP_LOGD("espnow", "Target RPM setpoint: %.0f", target_rpm);
-
-  // Store sender MAC for sending RPM feedback
-  memcpy(id(sender_mac), mac_addr, 6);
-
-  // Update target RPM sensor
-  id(target_rpm_setpoint) = (int)target_rpm;
-
-  // Adjustable RPM to PWM percentage mapping
-  // Method 1: Use multiplier (default: 0.05 %/RPM)
-  // speed_percent = target_rpm * multiplier
-  float multiplier = id(speed_mapping_multiplier).state;
-  float speed_percent = target_rpm * multiplier;
-
-  // Alternative method: Use max RPM reference (commented out)
-  // float max_rpm = id(max_rpm_reference).state;
-  // float speed_percent = (target_rpm / max_rpm) * 100.0;
-
-  // Clamp to 0-100%
-  if (speed_percent < 0) speed_percent = 0;
-  if (speed_percent > 100) speed_percent = 100;
-
-  // Update PWM percentage sensor for monitoring
-  id(motor_pwm_percent).publish_state(speed_percent);
-
-  auto call = id(bldc_motor).make_call();
-  if (target_rpm > 0) {
-    call.set_state(true);
-    call.set_speed((int)speed_percent);
-  } else {
-    call.set_state(false);
-  }
-  call.perform();
-}
-
-class ESPNowComponent : public Component {
- public:
-  void setup() override {
-    // Set WiFi channel (must match sender)
-    wifi_set_channel(1);
-    
-    if (esp_now_init() != 0) {
-      ESP_LOGE("espnow", "Error initializing ESP-NOW");
-      return;
-    }
-    
-    esp_now_set_self_role(ESP_NOW_ROLE_COMBO);
-    esp_now_register_recv_cb(OnDataRecv);
-    
-    // Print MAC address for configuration
-    uint8_t mac[6];
-    wifi_get_macaddr(STATION_IF, mac);
-    ESP_LOGI("espnow", "Motor Controller MAC: %02X:%02X:%02X:%02X:%02X:%02X",
-             mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-    
-    ESP_LOGI("espnow", "ESP-NOW receiver initialized successfully");
-  }
-  
-  void loop() override {
-    // Send RPM feedback to Airleaf controller every second
-    static unsigned long lastSendTime = 0;
-    unsigned long currentTime = millis();
-    
-    if (currentTime - lastSendTime >= 1000) {
-      lastSendTime = currentTime;
-      
-      // Prepare RPM data
-      outgoingData.speed_setpoint = id(motor_rpm).state;
-      
-      // Send to stored sender MAC address
-      if (id(sender_mac)[0] != 0 || id(sender_mac)[1] != 0 || 
-          id(sender_mac)[2] != 0 || id(sender_mac)[3] != 0 || 
-          id(sender_mac)[4] != 0 || id(sender_mac)[5] != 0) {
-        esp_now_send(id(sender_mac), (uint8_t*)&outgoingData, sizeof(outgoingData));
-      }
-    }
-  }
-};
-```
+### ESP-NOW Setup
+On first boot, the motor controller will print its MAC address to the log. Record this address for configuring the Airleaf controller.
 
 ---
 
 ## Wemos #2: Airleaf Controller Integration
 
-### Integration into `Airleaf.yaml`
+The Airleaf controller integration requires modifications to your existing `Airleaf.yaml` configuration and the addition of an ESP-NOW sender header file.
 
-The Airleaf controller reads the internal fan speed (Modbus register 015: "Fan speed") and sends the RPM value directly to the motor controller via ESP-NOW.
+**Repository Files:**
+- `Airleaf.yaml` - Modified to include ESP-NOW motor control
+- `espnow_sender.h` - ESP-NOW sender implementation
 
-**Important**: The motor controller integration is **optional**. The Airleaf device will function normally even if the motor controller is disabled or not configured. ESP-NOW will only be initialized when explicitly enabled and configured.
+### Integration Steps
 
-#### 1. Add ESP-NOW include file
-
+#### 1. Add ESP-NOW Include
+Add the include directive to your existing `esphome:` section in `Airleaf.yaml`:
 ```yaml
 esphome:
-  name: $devicename
+  name: airleaf
+  # ... existing configuration ...
   includes:
     - espnow_sender.h
-  on_boot:
-    priority: -100
-    then:
-      - lambda: |-
-          static ESPNowSender* espnow_sender = new ESPNowSender();
-          App.register_component(espnow_sender);
 ```
 
-#### 2. Add motor controller enable switch
+#### 2. Add Motor Control Components
+Add these sections to `Airleaf.yaml` (integrate with existing sensors, numbers, and globals sections):
 
+**Motor Speed Setpoint** (add to `number:` section):
 ```yaml
-switch:
-  # ... existing switches ...
-
-  # Enable/disable motor controller ESP-NOW communication
+number:
+  # ... existing numbers ...
+  
   - platform: template
-    name: "Motor Controller Enabled"
-    id: motor_controller_enabled
-    icon: "mdi:motor"
-    entity_category: config
-    restore_mode: RESTORE_DEFAULT_OFF
+    name: "Motor Speed Setpoint"
+    id: motor_speed_setpoint
+    min_value: 0
+    max_value: 100
+    step: 5
+    unit_of_measurement: "%"
+    mode: slider
     optimistic: true
+    icon: "mdi:fan"
+    on_value:
+      then:
+        - lambda: |-
+            ESP_LOGD("motor", "Setting motor speed to %.1f%%", x);
 ```
 
-#### 3. Add MAC address configuration (adjustable in Home Assistant)
-
+**RPM Feedback Sensor** (add to `sensor:` section):
 ```yaml
-text:
+sensor:
+  # ... existing sensors ...
+  
   - platform: template
-    name: "Slave Motor Controller MAC Address"
-    id: motor_controller_mac
-    entity_category: config
-    mode: text
-    optimistic: true
-    initial_value: "FF:FF:FF:FF:FF:FF"
-    restore_value: true
-    min_length: 17
-    max_length: 17
+    name: "Motor RPM Feedback"
+    id: motor_rpm_feedback
+    unit_of_measurement: 'RPM'
+    accuracy_decimals: 0
+    icon: "mdi:speedometer"
+    state_class: measurement
 ```
 
-**Note**: The custom component is registered via the `on_boot` hook shown in step 1 above.
+**Motor Controller MAC Address** (add to `globals:` section):
+```yaml
+globals:
+  # ... existing globals ...
+  
+  - id: motor_controller_mac
+    type: uint8_t[6]
+    restore_value: no
+    # IMPORTANT: Replace with actual MAC address from motor controller
+    # Format: {0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF}
+```
 
-### File: `espnow_sender.h`
-
-Create this file in your Airleaf ESPHome directory:
-
+#### 3. Configure Motor Controller MAC Address
+In the `espnow_sender.h` file, update the `motorControllerMac[]` array with the actual MAC address obtained from the motor controller's log output:
 ```cpp
-#include "esphome.h"
-
-extern "C" {
-  #include <espnow.h>
-  #include <user_interface.h>
-}
-
-// Data structure for ESP-NOW communication
-typedef struct struct_message {
-  float speed_setpoint;
-} struct_message;
-
-struct_message outgoingData;
-
-// Callback when data is sent
-void OnDataSent(uint8_t *mac_addr, uint8_t sendStatus) {
-  if (sendStatus == 0) {
-    ESP_LOGD("espnow", "Motor setpoint delivered successfully");
-  } else {
-    ESP_LOGW("espnow", "Motor setpoint delivery failed");
-  }
-}
-
-// Helper function to convert hex string to byte
-uint8_t hexToByte(const std::string& hex) {
-  return (uint8_t)strtol(hex.c_str(), nullptr, 16);
-}
-
-// Parse MAC address from "AA:BB:CC:DD:EE:FF" format
-bool parseMacAddress(const std::string& mac_str, uint8_t* mac_array) {
-  if (mac_str.length() != 17) {
-    return false;
-  }
-
-  for (int i = 0; i < 6; i++) {
-    int pos = i * 3;
-    if (i > 0 && mac_str[pos - 1] != ':') {
-      return false;
-    }
-    std::string byte_hex = mac_str.substr(pos, 2);
-    mac_array[i] = hexToByte(byte_hex);
-  }
-
-  return true;
-}
-
-class ESPNowSender : public Component {
- private:
-  bool espnow_initialized = false;
-  bool peer_added = false;
-  uint8_t motorControllerMac[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
-
- public:
-  void setup() override {
-    // Only initialize if slave motor controller is enabled
-    if (!id(motor_controller_enabled).state) {
-      ESP_LOGI("espnow", "Slave motor controller disabled - ESP-NOW not initialized");
-      return;
-    }
-
-    // Parse MAC address from single text field
-    std::string mac_str = id(motor_controller_mac).state;
-    if (!parseMacAddress(mac_str, motorControllerMac)) {
-      ESP_LOGE("espnow", "Invalid MAC address format: %s (expected AA:BB:CC:DD:EE:FF)", mac_str.c_str());
-      return;
-    }
-
-    // Check if MAC is all FF (unconfigured)
-    bool mac_configured = false;
-    for (int i = 0; i < 6; i++) {
-      if (motorControllerMac[i] != 0xFF) {
-        mac_configured = true;
-        break;
-      }
-    }
-
-    if (!mac_configured) {
-      ESP_LOGW("espnow", "Slave motor controller MAC not configured (all FF) - ESP-NOW not initialized");
-      return;
-    }
-
-    // Set WiFi channel (must match receiver)
-    wifi_set_channel(1);
-
-    if (esp_now_init() != 0) {
-      ESP_LOGE("espnow", "Error initializing ESP-NOW");
-      return;
-    }
-
-    esp_now_set_self_role(ESP_NOW_ROLE_SLAVE);
-    esp_now_register_send_cb(OnDataSent);
-    espnow_initialized = true;
-
-    // Add motor controller as peer
-    int result = esp_now_add_peer(motorControllerMac, ESP_NOW_ROLE_COMBO, 1, NULL, 0);
-    if (result == 0) {
-      peer_added = true;
-      ESP_LOGI("espnow", "Motor controller peer added: %02X:%02X:%02X:%02X:%02X:%02X",
-               motorControllerMac[0], motorControllerMac[1], motorControllerMac[2],
-               motorControllerMac[3], motorControllerMac[4], motorControllerMac[5]);
-    } else {
-      ESP_LOGE("espnow", "Failed to add motor controller peer (error %d)", result);
-    }
-
-    // Print this device's MAC address
-    uint8_t mac[6];
-    wifi_get_macaddr(STATION_IF, mac);
-    ESP_LOGI("espnow", "Airleaf MAC: %02X:%02X:%02X:%02X:%02X:%02X",
-             mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-
-    ESP_LOGI("espnow", "ESP-NOW sender initialized successfully");
-  }
-
-  void loop() override {
-    // Only send if motor controller is enabled and ESP-NOW is initialized
-    if (!id(motor_controller_enabled).state || !espnow_initialized || !peer_added) {
-      return;
-    }
-
-    // Send motor speed setpoint from "Fan speed" sensor as RPM
-    static float lastRPM = -1;
-    float currentRPM = id(fan_speed).state;
-
-    // Send if RPM changed by more than 5 RPM to reduce traffic
-    if (abs(currentRPM - lastRPM) > 5.0) {
-      lastRPM = currentRPM;
-
-      outgoingData.speed_setpoint = currentRPM;
-      int result = esp_now_send(motorControllerMac, (uint8_t*)&outgoingData, sizeof(outgoingData));
-
-      if (result != 0) {
-        ESP_LOGW("espnow", "Failed to send motor speed setpoint (error %d)", result);
-      } else {
-        ESP_LOGD("espnow", "Sent motor speed setpoint: %.0f RPM", currentRPM);
-      }
-    }
-  }
-};
+uint8_t motorControllerMac[] = {0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF}; // Replace with actual MAC
 ```
+
+### Communication Protocol
+- **Airleaf → Motor Controller**: Speed setpoint (0-100%) sent when value changes
+- **Motor Controller → Airleaf**: RPM feedback sent every 1 second
+- **Channel**: WiFi channel 1 (must match on both devices)
+- **Update behavior**: Immediate for setpoint changes, periodic for RPM feedback
 
 ---
 
 ## Physical Wiring
+
+### Wemos D1 Mini Pin Mapping
+
+The Wemos D1 Mini uses different labeling for pins compared to the underlying ESP8266 GPIO numbering. Here's the mapping for the pins used in this project:
+
+| Wemos Label | ESP8266 GPIO | Function in This Project | Connection |
+|-------------|--------------|--------------------------|------------|
+| D5 | GPIO14 | PWM Output | F-PWM (white wire) |
+| D6 | GPIO12 | Pulse Counter Input | F-FG (yellow wire) |
+| GND | GND | Ground Reference | GND (red wire) |
+| 5V | Power | 5V Power Input | From buck converter |
+
+**Additional Wemos D1 Mini Pin Reference:**
+
+| Wemos Label | ESP8266 GPIO | Notes |
+|-------------|--------------|-------|
+| D0 | GPIO16 | No PWM, no interrupts |
+| D1 | GPIO5 | I2C SCL |
+| D2 | GPIO4 | I2C SDA |
+| D3 | GPIO0 | Boot mode pin, pull-up |
+| D4 | GPIO2 | Built-in LED, pull-up |
+| D5 | GPIO14 | **Used for F-PWM** |
+| D6 | GPIO12 | **Used for F-FG** |
+| D7 | GPIO13 | |
+| D8 | GPIO15 | Boot mode pin, pull-down |
+| RX | GPIO3 | Serial RX |
+| TX | GPIO1 | Serial TX |
+
+**Pin Selection Notes:**
+- D5 (GPIO14) chosen for PWM output - supports hardware PWM
+- D6 (GPIO12) chosen for pulse counter - supports interrupts for accurate counting
+- Avoid D0 (GPIO16) for PWM as it doesn't support hardware PWM
+- Avoid D3, D4, D8 for critical functions as they affect boot mode
 
 ### Motor Controller Board Connections
 
@@ -580,14 +251,17 @@ class ESPNowSender : public Component {
 | F-FG | Yellow | Wemos D6 (GPIO12) |
 
 #### Motor Interface (5-pin connector)
-Connect to your 5-wire BLDC motor according to motor manufacturer's pinout:
-- +310V
-- HOT_GND
-- +15V
-- FG (motor tachometer)
-- VSP (motor speed control)
 
-**WARNING**: Different motor manufacturers may use different pin arrangements even with the same connector. Verify motor pinout before connection.
+**Connector Type**: KF2EDGR-3.96-5P (3.96mm pitch pluggable terminal block)
+
+Connect to your 5-wire BLDC motor according to motor manufacturer's pinout:
+- +310V (high-voltage DC positive bus)
+- HOT_GND (high-voltage ground return)
+- +15V (motor control power)
+- FG (motor tachometer feedback to board)
+- VSP (motor speed control from board)
+
+**WARNING**: Different motor manufacturers may use different pin arrangements even with the same KF2EDGR connector. The pin functions may be in a different order. Always verify motor pinout documentation before connection. Incorrect wiring can damage the motor or control board.
 
 #### AC Power Input
 - 220V AC Line (L)
@@ -609,35 +283,106 @@ Connect to your 5-wire BLDC motor according to motor manufacturer's pinout:
 
 ## Setup and Configuration Procedure
 
+### Bill of Materials
+
+**Required Components:**
+1. Motor control board (5-wire 310V BLDC controller with isolated control interface)
+2. Two (2) Wemos D1 Mini boards (ESP8266)
+3. 5-wire BLDC motor (310V, compatible with board)
+4. 12V to 5V buck converter (LM2596 or similar, 1A capacity minimum)
+5. 4-pin XH2.54 connector cable (for control interface)
+6. 5-pin KF2EDGR-3.96mm connector cable (for motor connection)
+7. 220V AC power cable with appropriate plug
+8. Fuse holder and 2A slow-blow fuse
+9. Project enclosure (rated for mains voltage)
+10. Wire: 22-16 AWG for motor connections, 26-22 AWG for control signals
+
+**Optional Components:**
+- External tachometer for RPM calibration
+- Terminal blocks for easier connection management
+- Heat shrink tubing for insulation
+- Cable ties for cable management
+- Multimeter for testing
+
 ### Step 1: Flash Motor Controller
 
 1. Flash `motor-controller.yaml` to first Wemos device
 2. Connect to WiFi and view logs
 3. **Record the MAC address** printed in logs (format: `AA:BB:CC:DD:EE:FF`)
 
-### Step 2: Configure Motor Controller in Home Assistant
+### Step 2: Update Airleaf Configuration
 
-1. Flash Airleaf configuration (motor controller integration starts disabled by default)
-2. In Home Assistant, navigate to the Airleaf device
-3. Enable the slave motor controller:
-   - Toggle "Slave Motor Controller Enabled" switch to **ON**
-4. Configure the MAC address from Step 1:
-   - Enter the complete MAC address in the format `AA:BB:CC:DD:EE:FF`
-   - Example: For MAC `A1:B2:C3:D4:E5:F6`, enter: `A1:B2:C3:D4:E5:F6`
-   - Field name: "Slave Motor Controller MAC Address"
-5. Restart the Airleaf device to apply changes
-
-**Note**: The Airleaf device functions normally even when the motor controller is disabled or not configured.
+1. Edit `espnow_sender.h` in your Airleaf directory
+2. Replace the placeholder MAC address in `motorControllerMac[]` with the actual MAC from Step 1:
+   ```cpp
+   uint8_t motorControllerMac[] = {0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF};
+   ```
+3. Flash updated Airleaf configuration
 
 ### Step 3: Physical Wiring
 
+**WARNING**: Work on the system only when ALL power is disconnected. The motor control board operates at dangerous voltages (220V AC input, 310V DC bus).
+
+#### Wemos #1 to Motor Control Board - Control Connector
+
+Using the 4-pin XH2.54 control connector:
+
+| Control Board Pin | Wire Color | Signal | Wemos D1 Mini Pin |
+|-------------------|------------|--------|-------------------|
+| Pin 1 | Black | GND | GND |
+| Pin 2 | Red | +12V | Via buck converter to 5V pin |
+| Pin 3 | White | F-PWM | D5 |
+| Pin 4 | Yellow | F-FG | D6 |
+
+**Wiring Steps:**
+
 1. **POWER OFF** all equipment
-2. Connect motor to board's 5-pin connector (verify pinout)
-3. Connect Wemos #1 to board's 4-pin control connector:
-   - Verify wire colors (red=GND, black=+12V)
-   - Double-check connections before applying power
-4. Connect 220V AC input to board
-5. Install buck converter if using board's 12V supply
+2. Prepare the 12V to 5V buck converter:
+   - Input: Board +12V (red wire) and GND (black wire)
+   - Output: Set to 5.0V ±0.1V before connecting to Wemos
+   - Capacity: Minimum 500mA (1A recommended)
+3. Connect control signals:
+   - Black wire (GND) → Wemos GND
+   - Red wire (+12V) → Buck converter input positive
+   - Black wire (GND) → Buck converter input negative
+   - Buck converter output positive → Wemos 5V pin
+   - Buck converter output negative → Wemos GND
+   - White wire (F-PWM) → Wemos D5
+   - Yellow wire (F-FG) → Wemos D6
+4. Double-check all connections before applying power
+
+#### Motor to Motor Control Board - Motor Connector
+
+Using the 5-pin KF2EDGR-3.96 motor connector:
+
+1. **Verify your motor's pinout** - do not assume the pin order matches the board labels
+2. Consult motor manufacturer documentation for the 5-wire pinout
+3. Connect motor wires to corresponding board pins:
+   - Match motor +310V to board +310V
+   - Match motor HOT_GND to board HOT_GND  
+   - Match motor +15V to board +15V
+   - Match motor FG to board FG
+   - Match motor VSP to board VSP
+4. Ensure connections are tight (terminal blocks require secure screw connections)
+
+#### AC Power to Motor Control Board
+
+1. Connect 220V AC to board AC input connector (typically 2-pin terminal block):
+   - Line (L) → Board L terminal
+   - Neutral (N) → Board N terminal
+2. Install appropriate fuse (2A slow-blow recommended for typical BLDC fan motors)
+3. Ensure proper earth/ground connection to motor chassis if metallic
+
+#### Safety Checklist Before Power-On
+
+- [ ] All connections verified against wiring diagram
+- [ ] Wire colors verified (standard: black=GND, red=+12V)
+- [ ] Buck converter output voltage set to 5.0V and tested
+- [ ] Motor connector pinout verified against motor documentation
+- [ ] No loose wires or connections
+- [ ] Insulation appropriate for 220V/310V voltages
+- [ ] Enclosure provides protection from accidental contact
+- [ ] Emergency shutoff readily accessible
 
 ### Step 4: Testing and Calibration
 
@@ -713,57 +458,28 @@ Connect to your 5-wire BLDC motor according to motor manufacturer's pinout:
 
 ### PWM Frequency Optimization
 
-Different motors may respond better to different PWM frequencies. Experiment with values between 500Hz and 25kHz:
-
-```yaml
-output:
-  - platform: esp8266_pwm
-    pin: D5
-    frequency: 5000 Hz  # Try different values
-    id: motor_pwm_output
-```
+Different motors may respond better to different PWM frequencies. The default 1000 Hz (1 kHz) works for most applications, but you can experiment with values between 500Hz and 25kHz in the motor controller configuration file. Higher frequencies produce smoother DC voltage from the RC filter but may increase switching losses.
 
 ### Voltage Level Shifting for Full Speed Range
 
-To achieve full motor speed range (0-100% instead of 0-55%), add a voltage level shifter:
+To achieve full motor speed range (0-100% instead of 0-55%), add a voltage level shifter circuit between the Wemos and the F-PWM input. A simple transistor-based level shifter can scale the 0-3.3V output from the Wemos to 0-6V:
 
-**Simple transistor-based level shifter:**
-```
-Wemos D5 (3.3V PWM) → 10kΩ → NPN transistor base
-                                ↓ collector (pulled to 6V via 10kΩ)
-                                ↓ emitter → GND
-                                
-Collector output → F-PWM (0-6V PWM)
-```
-
-Components needed:
+**Components needed:**
 - NPN transistor: 2N2222 or similar
 - Two 10kΩ resistors
 - 6V regulator (LM7806) powered from board's 12V supply
 
+The level shifter inverts and amplifies the PWM signal to provide full voltage range control.
+
 ### Enhanced Monitoring
 
-Add additional sensors for comprehensive monitoring:
+Additional template sensors can be added to both configurations for:
+- **Motor power estimation**: Calculate approximate power based on RPM and speed setpoint
+- **Communication quality monitoring**: Track ESP-NOW delivery success/failure rates
+- **Running time tracking**: Log cumulative motor operation hours
+- **RPM stability analysis**: Detect vibration or load variations
 
-```yaml
-sensor:
-  # Motor power estimation
-  - platform: template
-    name: "Motor Power Estimate"
-    unit_of_measurement: "W"
-    lambda: |-
-      float rpm = id(motor_rpm).state;
-      float speed_pct = id(motor_speed_setpoint).state;
-      // Simplified power estimation - adjust coefficients for your motor
-      return (rpm / 1000.0) * (speed_pct / 100.0) * 50.0;
-    update_interval: 5s
-
-  # Communication quality
-  - platform: template
-    name: "ESP-NOW Signal Quality"
-    unit_of_measurement: "%"
-    # Implement based on delivery success/failure rate
-```
+See the repository configuration files for implementation examples.
 
 ---
 
@@ -785,22 +501,7 @@ sensor:
 
 2. **Emergency Stop**: Consider adding an emergency stop button that cuts AC power.
 
-3. **Startup Sequence**: Implement gradual speed ramp-up to reduce mechanical stress:
-   ```yaml
-   script:
-     - id: ramp_motor_speed
-       parameters:
-         target_speed: float
-       then:
-         - while:
-             condition:
-               lambda: 'return id(motor_speed_setpoint).state < target_speed;'
-             then:
-               - number.set:
-                   id: motor_speed_setpoint
-                   value: !lambda 'return id(motor_speed_setpoint).state + 5;'
-               - delay: 200ms
-   ```
+3. **Startup Sequence**: Implement gradual speed ramp-up to reduce mechanical stress on the motor. This can be done through the motor speed setpoint control by incrementing in small steps with delays.
 
 4. **Thermal Monitoring**: Monitor motor temperature if continuous high-speed operation is expected.
 
@@ -834,33 +535,40 @@ sensor:
 
 ### For jjdejong/esphome-airleaf Repository
 
+**Repository**: https://github.com/jjdejong/esphome-airleaf
+
 1. **File Organization**:
    ```
    esphome-airleaf/
    ├── Airleaf.yaml              (modified with ESP-NOW integration)
-   ├── espnow_sender.h           (new file)
+   ├── espnow_sender.h           (new file for Airleaf ESP-NOW sender)
    ├── motor-controller/
-   │   ├── motor-controller.yaml (new file)
-   │   └── espnow_receiver.h     (new file)
+   │   ├── motor-controller.yaml (new file - motor controller config)
+   │   └── espnow_receiver.h     (new file - ESP-NOW receiver)
    └── docs/
        └── BLDC_Motor_Integration.md (this document)
    ```
 
-2. **Version Control**: 
-   - Tag motor controller MAC address configuration as requiring user modification
-   - Include example MAC address format in comments
-   - Document calibration values as user-specific
+2. **Configuration Files**:
+   - All ESPHome YAML configurations and C++ header files are available in the repository
+   - Refer to the repository files for complete, tested code
+   - This document provides integration guidance and hardware specifications
 
-3. **Dependencies**:
+3. **Version Control**: 
+   - Motor controller MAC address configuration requires user modification
+   - Example MAC address format included in code comments
+   - Calibration values (tachometer multiplier) are motor-specific
+
+4. **Dependencies**:
    - ESPHome 2023.x or later
    - ESP8266 Arduino Core with ESP-NOW support
    - No external libraries required beyond standard ESP8266 SDK
 
-4. **Testing Checklist**:
+5. **Testing Checklist**:
    - [ ] ESP-NOW pairing successful
    - [ ] Speed setpoint transmission verified
    - [ ] RPM feedback reception verified
-   - [ ] Motor responds to full speed range (0-100%)
+   - [ ] Motor responds to speed control (0-100%)
    - [ ] Communication maintained during WiFi activity
    - [ ] OTA updates work on both devices
    - [ ] Logs show no errors or warnings
@@ -936,6 +644,42 @@ This integration documentation follows the same license as the esphome-airleaf r
 | Version | Date | Changes |
 |---------|------|---------|
 | 1.0 | 2024-12-14 | Initial documentation |
+| 1.1 | 2024-12-24 | Added connector type identification (KF2EDGR-3.96, XH2.54), Wemos D1 Mini pin mapping, detailed wiring instructions, and bill of materials |
+
+---
+
+## Appendix: Connector Specifications
+
+### Control Connector (XH2.54)
+
+**Specifications:**
+- Pitch: 2.54mm (0.1")
+- Positions: 4 pins
+- Wire-to-board connection
+- Typically uses crimped terminals
+- Compatible with standard 2.54mm pitch headers
+
+**Ordering Information:**
+- Search terms: "XH2.54 4 pin connector", "2.54mm JST-XH 4 pin"
+- Mating header: 2.54mm straight or right-angle pin header
+- Crimp terminals: XH-style 2.54mm crimp pins
+
+### Motor Connector (KF2EDGR-3.96)
+
+**Specifications:**
+- Pitch: 3.96mm
+- Positions: 5 pins
+- Pluggable screw terminal block
+- Current: 8-10A per pin
+- Voltage: 300V
+- Wire range: 22-16 AWG (0.5-1.5mm²)
+
+**Ordering Information:**
+- Search terms: "KF2EDGR 3.96mm 5 pin", "KF396 terminal block 5 pin", "3.96mm pitch pluggable terminal 5P"
+- Alternatives: DG396, KF396 series
+- Includes: Plug housing with screw terminals + mating header for PCB
+
+**Wiring tip**: For permanent installations, consider using ferrules on wire ends before inserting into screw terminals for better connection reliability.
 
 ---
 
